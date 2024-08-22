@@ -15,7 +15,12 @@ declare_id!("GyuBciZmWHt822Cak6q6RLFagT6oWHwcVb63vwfgt3FA");
 pub mod solana_options {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, amount_underlying: u64) -> Result<()> {
-        initialize::handler(ctx, amount_underlying)
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        amount_underlying: u64,
+        amount_quote: u64,
+        expiry_unix_timestamp: i64,
+    ) -> Result<()> {
+        initialize::handler(ctx, amount_underlying, amount_quote, expiry_unix_timestamp)
     }
 }

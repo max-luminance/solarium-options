@@ -3,7 +3,7 @@
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-    "test": "vitest run"
+    "test": "RUST_LOG= vitest run"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.30.1",

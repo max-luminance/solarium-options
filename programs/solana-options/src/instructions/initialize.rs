@@ -1,3 +1,4 @@
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -6,12 +7,14 @@ use anchor_spl::{
 
 
 use crate::state::CoveredCall;
+use crate::error::ErrorCode;
 
 #[derive(Accounts)]
-#[instruction(amount_underlying: u64)]
+#[instruction(amount_underlying: u64, amount_quote: u64, expiry_unix_timestamp: i64)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub seller: Signer<'info>,
+    pub buyer: SystemAccount<'info>,
     #[account(
         init, 
         payer = seller,
@@ -21,6 +24,7 @@ pub struct Initialize<'info> {
     )]
     pub data: Account<'info, CoveredCall>,
     pub mint_underlying: Account<'info, Mint>,
+    pub mint_quote: Account<'info, Mint>,
     #[account(
         mut,
         constraint = ata_seller_underlying.amount >= amount_underlying,
@@ -40,13 +44,21 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<Initialize>, amount_underlying: u64) -> Result<()> {
-    msg!("Greetings from: {:?}", ctx.accounts.seller.key());
+pub fn handler(ctx: Context<Initialize>, amount_underlying: u64, amount_quote: u64, expiry_unix_timestamp: i64) -> Result<()> {
+    let clock = Clock::get()?;
+    msg!("Greetings from: {:?}", clock.unix_timestamp);
+    
+    require!(expiry_unix_timestamp > clock.unix_timestamp, ErrorCode::ExpiryIsInThePast);
 
     // Set state
     ctx.accounts.data.set_inner(CoveredCall {
-        seller: ctx.accounts.seller.key(),
+        amount_quote: amount_quote,
         amount_underlying: amount_underlying,
+        buyer: ctx.accounts.buyer.key(),
+        expiry_unix_timestamp: expiry_unix_timestamp,
+        mint_quote: ctx.accounts.mint_quote.key(),
+        mint_underlying: ctx.accounts.mint_underlying.key(),
+        seller: ctx.accounts.seller.key(),
     });
     
     // Transfer underlying to vault

@@ -12,7 +12,7 @@ import {
   mintTo,
   getAccount,
 } from "spl-token-bankrun";
-import { PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 
 async function getAtaTokenBalance(
   client: BanksClient,
@@ -34,14 +34,24 @@ const fixture = async () => {
   const authority = anchor.web3.Keypair.generate();
 
   const seller = context.payer;
+  const buyer = Keypair.generate();
 
-  const wsol = await createMint(
-    context.banksClient,
-    context.payer,
-    authority.publicKey,
-    authority.publicKey,
-    9
-  );
+  const [wsol, usdc] = await Promise.all([
+    createMint(
+      context.banksClient,
+      context.payer,
+      authority.publicKey,
+      authority.publicKey,
+      9
+    ),
+    createMint(
+      context.banksClient,
+      context.payer,
+      authority.publicKey,
+      authority.publicKey,
+      6
+    ),
+  ]);
 
   const ata_seller = await createAssociatedTokenAccount(
     context.banksClient,
@@ -71,6 +81,8 @@ const fixture = async () => {
     pda,
     wsol,
     seller,
+    usdc,
+    buyer,
   };
 };
 expect.extend({
@@ -86,22 +98,35 @@ expect.extend({
 
 describe("solana-options", () => {
   it("Can initialize option", async () => {
-    const { context, program, pda, wsol, seller } = await fixture();
+    const { context, program, pda, wsol, seller, usdc, buyer } =
+      await fixture();
 
     expect(
       await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
     ).to.equal(BigInt(1000));
 
+    const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
     const tx = await program.methods
-      .initialize(new anchor.BN("1000"))
+      .initialize(
+        new anchor.BN("1000"),
+        new anchor.BN(1),
+        new anchor.BN(expiry)
+      )
       .accounts({
         mintUnderlying: wsol,
+        mintQuote: usdc,
+        buyer: buyer.publicKey,
       })
       .rpc();
 
     // Check state
     expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
+      amountQuote: expect.toBeBN(new anchor.BN(1)),
       amountUnderlying: expect.toBeBN(new anchor.BN(1000)),
+      buyer: buyer.publicKey,
+      expiryUnixTimestamp: expect.toBeBN(expiry),
+      mintQuote: usdc,
+      mintUnderlying: wsol,
       seller: context.payer.publicKey,
     });
 
@@ -114,8 +139,8 @@ describe("solana-options", () => {
     );
   });
 
-  it("Can reject insufficient underlying", async () => {
-    const { context, program, wsol, seller } = await fixture();
+  it("Can reject initialize with expiry in the past", async () => {
+    const { context, program, wsol, seller, usdc, buyer } = await fixture();
 
     expect(
       await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
@@ -123,9 +148,39 @@ describe("solana-options", () => {
 
     await expect(
       program.methods
-        .initialize(new anchor.BN("10000"))
+        .initialize(
+          new anchor.BN("1000"),
+          new anchor.BN(1),
+          new anchor.BN(Math.floor(Date.now() / 1000) - 600)
+        )
         .accounts({
           mintUnderlying: wsol,
+          mintQuote: usdc,
+          buyer: buyer.publicKey,
+        })
+        .rpc()
+    ).rejects.toThrowError(
+      /^AnchorError thrown in programs\/solana-options\/src\/instructions\/initialize.rs:\d+. Error Code: ExpiryIsInThePast. Error Number: 6000. Error Message: Expiry is in the past.$/
+    );
+  });
+  it("Can reject initialize with insufficient underlying", async () => {
+    const { context, program, wsol, seller, usdc, buyer } = await fixture();
+
+    expect(
+      await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+    ).to.equal(BigInt(1000));
+
+    await expect(
+      program.methods
+        .initialize(
+          new anchor.BN("10000"),
+          new anchor.BN(1),
+          new anchor.BN(Math.floor(Date.now() / 1000) + 60)
+        )
+        .accounts({
+          mintUnderlying: wsol,
+          mintQuote: usdc,
+          buyer: buyer.publicKey,
         })
         .rpc()
     ).rejects.toThrowError(
