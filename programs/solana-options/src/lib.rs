@@ -23,4 +23,8 @@ pub mod solana_options {
     ) -> Result<()> {
         initialize::handler(ctx, amount_underlying, amount_quote, expiry_unix_timestamp)
     }
+
+    pub fn buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
+        buy::handler(ctx, amount_premium)
+    }
 }

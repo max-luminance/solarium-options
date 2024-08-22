@@ -10,4 +10,6 @@ pub struct CoveredCall {
     pub expiry_unix_timestamp: i64,
     pub mint_quote: Pubkey,
     pub mint_underlying: Pubkey,
+    pub bump: u8,
+    pub amount_premium: Option<u64>,
 }
