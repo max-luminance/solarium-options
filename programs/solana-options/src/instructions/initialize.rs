@@ -19,7 +19,7 @@ pub struct Initialize<'info> {
         init, 
         payer = seller,
         space = 8 + CoveredCall::INIT_SPACE,
-        seeds = ["covered-call".as_bytes(), seller.key().as_ref()], // TODO:- Improve the seed, so can mint many
+        seeds = ["covered-call".as_bytes(), seller.key().as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
         bump,
     )]
     pub data: Account<'info, CoveredCall>,
@@ -27,7 +27,7 @@ pub struct Initialize<'info> {
     pub mint_quote: Account<'info, Mint>,
     #[account(
         mut,
-        constraint = ata_seller_underlying.amount >= amount_underlying, // TODO:- Do we want to add a minimum?
+        constraint = ata_seller_underlying.amount >= amount_underlying, 
         associated_token::mint = mint_underlying,
         associated_token::authority = seller,
     )]
@@ -44,7 +44,7 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<Initialize>, amount_underlying: u64, amount_quote: u64, expiry_unix_timestamp: i64) -> Result<()> {
+pub fn handle_initialize(ctx: Context<Initialize>, amount_underlying: u64, amount_quote: u64, expiry_unix_timestamp: i64) -> Result<()> {
     let clock = Clock::get()?;
     
     require!(expiry_unix_timestamp > clock.unix_timestamp, ErrorCode::ExpiryIsInThePast);
@@ -60,6 +60,7 @@ pub fn handler(ctx: Context<Initialize>, amount_underlying: u64, amount_quote: u
         seller: ctx.accounts.seller.key(),
         bump: ctx.bumps.data,
         amount_premium: None,
+        is_exercised: false,
     });
     
     // Transfer underlying to vault

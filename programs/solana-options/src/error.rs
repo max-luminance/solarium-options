@@ -8,4 +8,6 @@ pub enum ErrorCode {
     OptionExpired,
     #[msg("Option is already bought")]
     OptionAlreadyBought,
+    #[msg("Option was not purchased")]
+    OptionNotPurchased,
 }

@@ -21,10 +21,14 @@ pub mod solana_options {
         amount_quote: u64,
         expiry_unix_timestamp: i64,
     ) -> Result<()> {
-        initialize::handler(ctx, amount_underlying, amount_quote, expiry_unix_timestamp)
+        handle_initialize(ctx, amount_underlying, amount_quote, expiry_unix_timestamp)
     }
 
     pub fn buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
-        buy::handler(ctx, amount_premium)
+        handle_buy(ctx, amount_premium)
+    }
+
+    pub fn exercise(ctx: Context<Exercise>) -> Result<()> {
+        handle_exercise(ctx)
     }
 }

@@ -12,4 +12,5 @@ pub struct CoveredCall {
     pub mint_underlying: Pubkey,
     pub bump: u8,
     pub amount_premium: Option<u64>,
+    pub is_exercised: bool,
 }

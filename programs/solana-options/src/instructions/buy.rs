@@ -38,7 +38,7 @@ pub struct Buy<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
+pub fn handle_buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
     let clock = Clock::get()?;
     msg!(
         "Greetings from: {:?} {:?}",
