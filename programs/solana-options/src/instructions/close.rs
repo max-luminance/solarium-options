@@ -11,12 +11,24 @@ use crate::state::CoveredCall;
 
 #[derive(Accounts)]
 pub struct Close<'info> {
+    #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut, constraint = seller.key() == data.seller)]
     pub seller: SystemAccount<'info>,
+    #[account(mut, constraint = buyer.key() == data.buyer)]
+    pub buyer: SystemAccount<'info>,
     #[account(
         mut,
-        seeds = ["covered-call".as_bytes(), &data.amount_quote.to_le_bytes(), data.seller.as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
+        seeds = [
+            "covered-call".as_bytes(), 
+            seller.key().as_ref(),
+            buyer.key().as_ref(),
+            mint_underlying.key().as_ref(),
+            mint_quote.key().as_ref(),
+            &data.amount_underlying.to_le_bytes(), 
+            &data.amount_quote.to_le_bytes(), 
+            &data.expiry_unix_timestamp.to_le_bytes(), 
+        ],
         bump = data.bump,
         close = seller,
     )]
@@ -39,14 +51,13 @@ pub struct Close<'info> {
     pub ata_seller_quote: Account<'info, TokenAccount>,
     #[account(
         mut,
-        // close = seller,
         associated_token::mint = mint_underlying,
         associated_token::authority = data,
     )]
     pub ata_vault_underlying: Account<'info, TokenAccount>,
     #[account(
-        mut,
-        // close = seller,
+        init_if_needed,
+        payer = payer,
         associated_token::mint = mint_quote,
         associated_token::authority = data,
     )]
@@ -58,6 +69,19 @@ pub struct Close<'info> {
 
 pub fn handle_close(ctx: Context<Close>) -> Result<()> {
     let clock = Clock::get()?;
+
+    let seeds = [
+        "covered-call".as_bytes(), 
+        ctx.accounts.data.seller.as_ref(),
+        ctx.accounts.data.buyer.as_ref(),
+        ctx.accounts.data.mint_underlying.as_ref(),
+        ctx.accounts.data.mint_quote.as_ref(),
+        &ctx.accounts.data.amount_underlying.to_le_bytes(), 
+        &ctx.accounts.data.amount_quote.to_le_bytes(), 
+        &ctx.accounts.data.expiry_unix_timestamp.to_le_bytes(), 
+        &[ctx.accounts.data.bump],
+    ];
+    let signer = &[&seeds[..]];
 
     require!(
         clock.unix_timestamp > ctx.accounts.data.expiry_unix_timestamp
@@ -77,12 +101,7 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
                     mint: ctx.accounts.mint_underlying.to_account_info(),
                     authority: ctx.accounts.data.to_account_info(),
                 },
-                &[&[
-                    "covered-call".as_bytes(),
-                    &ctx.accounts.data.amount_quote.to_le_bytes(),
-                    ctx.accounts.data.seller.as_ref(),
-                    &[ctx.accounts.data.bump],
-                ]],
+                signer,
             ),
             ctx.accounts.ata_vault_underlying.amount,
             ctx.accounts.mint_underlying.decimals,
@@ -100,12 +119,7 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
                     mint: ctx.accounts.mint_quote.to_account_info(),
                     authority: ctx.accounts.data.to_account_info(),
                 },
-                &[&[
-                    "covered-call".as_bytes(),
-                    &ctx.accounts.data.amount_quote.to_le_bytes(),
-                    ctx.accounts.data.seller.as_ref(),
-                    &[ctx.accounts.data.bump],
-                ]],
+                signer,
             ),
             ctx.accounts.ata_vault_quote.amount,
             ctx.accounts.mint_quote.decimals,
@@ -119,27 +133,17 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
             destination: ctx.accounts.seller.to_account_info(),
             authority: ctx.accounts.data.to_account_info(),
         },
-        &[&[
-            "covered-call".as_bytes(),
-            &ctx.accounts.data.amount_quote.to_le_bytes(),
-            ctx.accounts.data.seller.as_ref(),
-            &[ctx.accounts.data.bump],
-        ]],
+        signer,
     ))?;
 
     close_account(CpiContext::new_with_signer(
         ctx.accounts.token_program.to_account_info(),
         CloseAccount {
             account: ctx.accounts.ata_vault_quote.to_account_info(),
-            destination: ctx.accounts.seller.to_account_info(),
+            destination: ctx.accounts.buyer.to_account_info(),
             authority: ctx.accounts.data.to_account_info(),
         },
-        &[&[
-            "covered-call".as_bytes(),
-            &ctx.accounts.data.amount_quote.to_le_bytes(),
-            ctx.accounts.data.seller.as_ref(),
-            &[ctx.accounts.data.bump],
-        ]],
+        signer,
     ))?;
 
     Ok(())

@@ -17,10 +17,19 @@ pub struct Initialize<'info> {
         init,
         payer = seller,
         space = 8 + CoveredCall::INIT_SPACE,
-        seeds = ["covered-call".as_bytes(), &amount_quote.to_le_bytes(), seller.key().as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
+        seeds = [
+            b"covered-call",
+            seller.key().as_ref(),
+            buyer.key().as_ref(),
+            mint_underlying.key().as_ref(),
+            mint_quote.key().as_ref(),
+            amount_underlying.to_le_bytes().as_ref(),
+            amount_quote.to_le_bytes().as_ref(),
+            expiry_unix_timestamp.to_le_bytes().as_ref(),
+        ],
         bump,
     )]
-    pub data: Box<Account<'info, CoveredCall>>,
+    pub data: Account<'info, CoveredCall>,
     pub mint_underlying: Account<'info, Mint>,
     pub mint_quote: Account<'info, Mint>,
     #[account(
@@ -37,13 +46,14 @@ pub struct Initialize<'info> {
         associated_token::authority = data,
     )]
     pub ata_vault_underlying: Account<'info, TokenAccount>,
-    #[account(
-        init,
-        payer = seller,
-        associated_token::mint = mint_quote,
-        associated_token::authority = data,
-    )]
-    pub ata_vault_quote: Account<'info, TokenAccount>,
+    // Can't figure out why i can't init this account here
+    // #[account(
+    //     init,
+    //     payer = seller,
+    //     associated_token::mint = mint_quote,
+    //     associated_token::authority = data,
+    // )]
+    // pub ata_vault_quote: Account<'info, TokenAccount>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

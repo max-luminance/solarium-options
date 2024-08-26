@@ -14,7 +14,16 @@ pub struct Buy<'info> {
     pub buyer: Signer<'info>,
     #[account(
         mut,
-        seeds = ["covered-call".as_bytes(), &data.amount_quote.to_le_bytes(), data.seller.as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
+        seeds = [
+            "covered-call".as_bytes(), 
+            data.seller.as_ref(),
+            buyer.key().as_ref(),
+            data.mint_underlying.as_ref(),
+            data.mint_quote.as_ref(),
+            &data.amount_underlying.to_le_bytes(), 
+            &data.amount_quote.to_le_bytes(), 
+            &data.expiry_unix_timestamp.to_le_bytes(), 
+        ], 
         bump = data.bump,
     )]
     pub data: Account<'info, CoveredCall>,
@@ -40,11 +49,6 @@ pub struct Buy<'info> {
 
 pub fn handle_buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
     let clock = Clock::get()?;
-    msg!(
-        "Greetings from: {:?} {:?}",
-        ctx.accounts.buyer.key(),
-        amount_premium
-    );
 
     require!(
         clock.unix_timestamp <= ctx.accounts.data.expiry_unix_timestamp,

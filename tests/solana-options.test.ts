@@ -50,18 +50,31 @@ async function airdrop(
   });
 }
 
+async function fundAtaAccountWithPayer(
+  client: BanksClient,
+  mint: PublicKey,
+  payer: Signer,
+  user: PublicKey,
+  amount: bigint | number
+) {
+  const ata = await createAssociatedTokenAccount(client, payer, mint, user);
+
+  await mintTo(client, payer, mint, ata, authority, amount);
+}
+
 async function fundAtaAccount(
   client: BanksClient,
   mint: PublicKey,
   signer: Signer,
   amount: bigint | number
 ) {
-  const payer = signer;
-  const user = signer.publicKey;
-
-  const ata = await createAssociatedTokenAccount(client, payer, mint, user);
-
-  await mintTo(client, payer, mint, ata, authority, amount);
+  return fundAtaAccountWithPayer(
+    client,
+    mint,
+    signer,
+    signer.publicKey,
+    amount
+  );
 }
 
 const warpTo = async (context: ProgramTestContext, ms: anchor.BN) => {
@@ -122,15 +135,25 @@ const fixtureDeployed = async () => {
 };
 
 function getPda(seeds: {
+  amountQuote: anchor.BN;
+  amountUnderlying: anchor.BN;
+  buyer: PublicKey;
+  expiry: anchor.BN;
+  mintQuote: PublicKey;
+  mintUnderlying: PublicKey;
   programId: PublicKey;
   seller: PublicKey;
-  amountQuote: anchor.BN;
 }) {
   const [pda] = anchor.web3.PublicKey.findProgramAddressSync(
     [
       Buffer.from("covered-call"),
-      seeds.amountQuote.toArrayLike(Buffer, "le", 8),
       seeds.seller.toBuffer(),
+      seeds.buyer.toBuffer(),
+      seeds.mintUnderlying.toBuffer(),
+      seeds.mintQuote.toBuffer(),
+      seeds.amountUnderlying.toArrayLike(Buffer, "le", 8),
+      seeds.amountQuote.toArrayLike(Buffer, "le", 8),
+      seeds.expiry.toArrayLike(Buffer, "le", 8),
     ],
     seeds.programId
   );
@@ -156,6 +179,11 @@ const fixtureInitialized = async () => {
 
   const pda = getPda({
     amountQuote: new anchor.BN("3500"),
+    amountUnderlying: new anchor.BN("1000"),
+    buyer: buyer.publicKey,
+    expiry: expiry,
+    mintQuote: usdc,
+    mintUnderlying: wsol,
     programId: program.programId,
     seller: context.payer.publicKey,
   });
@@ -226,29 +254,43 @@ describe("solana-options", () => {
       ).to.equal(BigInt(1000));
 
       const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
-      await airdrop(context, seller.publicKey, 1 * LAMPORTS_PER_SOL);
-      const tx = await program.methods
-        .initialize(
-          new anchor.BN("1000"),
-          new anchor.BN(1),
-          new anchor.BN(expiry)
-        )
-        .accounts({
-          mintUnderlying: wsol,
-          mintQuote: usdc,
-          buyer: buyer.publicKey,
-        })
-        .rpc();
+      await airdrop(context, seller.publicKey, 10_000 * LAMPORTS_PER_SOL);
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(1000));
 
       const pda = getPda({
-        amountQuote: new anchor.BN("1"),
+        amountQuote: new anchor.BN("42"),
+        amountUnderlying: new anchor.BN("1000"),
+        buyer: buyer.publicKey,
+        expiry: expiry,
+        mintQuote: usdc,
+        mintUnderlying: wsol,
         programId: program.programId,
         seller: context.payer.publicKey,
       });
+      const ata = token.getAssociatedTokenAddressSync(wsol, pda, true);
+      // await fundAtaAccountWithPayer(context.banksClient, wsol, seller, pda, 0);
+      const tx = await program.methods
+        .initialize(
+          new anchor.BN("1000"),
+          new anchor.BN("42"),
+          new anchor.BN(expiry)
+        )
+        .accounts({
+          buyer: buyer.publicKey,
+          mintQuote: usdc,
+          mintUnderlying: wsol,
+          seller: seller.publicKey,
+          // data: pda,
+        })
+        .signers([seller])
+        .rpc();
+
       // Check state
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountPremium: null,
-        amountQuote: expect.toBeBN(new anchor.BN(1)),
+        amountQuote: expect.toBeBN(new anchor.BN(42)),
         amountUnderlying: expect.toBeBN(new anchor.BN(1000)),
         buyer: buyer.publicKey,
         expiryUnixTimestamp: expect.toBeBN(expiry),
@@ -472,6 +514,23 @@ describe("solana-options", () => {
           .signers([buyer])
           .rpc()
       ).rejects.toThrowError(
+        "AnchorError caused by account: ata_vault_premium. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized."
+      );
+
+      // Also test when ata is initialized
+      await createAssociatedTokenAccount(context.banksClient, buyer, usdc, pda);
+
+      await expect(
+        program.methods
+          .buy(new anchor.BN(500))
+          .accounts({
+            data: pda,
+            buyer: buyer.publicKey,
+            mintPremium: usdc,
+          })
+          .signers([buyer])
+          .rpc()
+      ).rejects.toThrowError(
         "AnchorError caused by account: mint_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
@@ -520,7 +579,6 @@ describe("solana-options", () => {
     it("Can successfully exercise", async () => {
       const { program, pda, buyer, wsol, context, usdc } =
         await fixtureBought();
-      s;
       // Create and fund the ata account for the buyer
       await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
 
@@ -751,6 +809,7 @@ describe("solana-options", () => {
           mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
+          buyer: buyer.publicKey,
         })
         .signers([seller])
         .rpc();
@@ -812,6 +871,7 @@ describe("solana-options", () => {
           data: pda,
           seller: seller.publicKey,
           payer: keeper.publicKey,
+          buyer: buyer.publicKey,
         })
         .signers([keeper])
         .rpc();
@@ -860,6 +920,7 @@ describe("solana-options", () => {
           data: pda,
           seller: seller.publicKey,
           payer: keeper.publicKey,
+          buyer: buyer.publicKey,
         })
         .signers([keeper])
         .rpc();
@@ -879,7 +940,7 @@ describe("solana-options", () => {
     });
 
     it("Can successfully close unexercised option after expiry", async () => {
-      const { program, pda, wsol, context, usdc, seller, expiry } =
+      const { program, pda, wsol, context, usdc, seller, expiry, buyer } =
         await fixtureBought();
 
       await fundAtaAccount(context.banksClient, usdc, seller, 0);
@@ -906,6 +967,7 @@ describe("solana-options", () => {
           data: pda,
           seller: seller.publicKey,
           payer: seller.publicKey,
+          buyer: buyer.publicKey,
         })
         .signers([seller])
         .rpc();
@@ -938,7 +1000,7 @@ describe("solana-options", () => {
     });
 
     it("Can reject closing bought option before expiry", async () => {
-      const { program, pda, wsol, context, usdc, seller } =
+      const { program, pda, wsol, context, usdc, seller, buyer } =
         await fixtureBought();
 
       await fundAtaAccount(context.banksClient, usdc, seller, 0);
@@ -947,11 +1009,12 @@ describe("solana-options", () => {
         program.methods
           .close()
           .accounts({
-            mintUnderlying: wsol,
-            mintQuote: usdc,
+            buyer: buyer.publicKey,
             data: pda,
-            seller: seller.publicKey,
+            mintQuote: usdc,
+            mintUnderlying: wsol,
             payer: seller.publicKey,
+            seller: seller.publicKey,
           })
           .signers([seller])
           .rpc()
