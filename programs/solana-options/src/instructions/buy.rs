@@ -14,7 +14,7 @@ pub struct Buy<'info> {
     pub buyer: Signer<'info>,
     #[account(
         mut,
-        seeds = ["covered-call".as_bytes(), data.seller.as_ref()],
+        seeds = ["covered-call".as_bytes(), &data.amount_quote.to_le_bytes(), data.seller.as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
         bump = data.bump,
     )]
     pub data: Account<'info, CoveredCall>,
@@ -52,8 +52,8 @@ pub fn handle_buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
     );
 
     require!(
-      ctx.accounts.data.amount_premium.is_none(),
-      ErrorCode::OptionAlreadyBought
+        ctx.accounts.data.amount_premium.is_none(),
+        ErrorCode::OptionAlreadyBought
     );
     ctx.accounts.data.amount_premium = Some(amount_premium);
 

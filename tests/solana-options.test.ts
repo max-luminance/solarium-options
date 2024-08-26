@@ -18,7 +18,6 @@ import {
   getAccount,
 } from "spl-token-bankrun";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, Signer } from "@solana/web3.js";
-import { aw } from "vitest/dist/chunks/reporters.C_zwCd4j.js";
 
 const authority = anchor.web3.Keypair.generate();
 async function getAtaTokenBalance(
@@ -111,25 +110,36 @@ const fixtureDeployed = async () => {
     fundAtaAccount(context.banksClient, wsol, buyer, BigInt(1000)),
   ]);
 
-  const [pda] = anchor.web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("covered-call"), context.payer.publicKey.toBuffer()],
-    program.programId
-  );
-
   return {
     context,
     program,
     provider,
-    pda,
     wsol,
     seller,
     usdc,
     buyer,
   };
 };
+
+function getPda(seeds: {
+  programId: PublicKey;
+  seller: PublicKey;
+  amountQuote: anchor.BN;
+}) {
+  const [pda] = anchor.web3.PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("covered-call"),
+      seeds.amountQuote.toArrayLike(Buffer, "le", 8),
+      seeds.seller.toBuffer(),
+    ],
+    seeds.programId
+  );
+  return pda;
+}
+
 const fixtureInitialized = async () => {
   const fixture = await fixtureDeployed();
-  const { program, wsol, usdc, buyer } = fixture;
+  const { context, program, wsol, usdc, buyer } = fixture;
   const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
   await program.methods
     .initialize(
@@ -144,8 +154,15 @@ const fixtureInitialized = async () => {
     })
     .rpc();
 
+  const pda = getPda({
+    amountQuote: new anchor.BN("3500"),
+    programId: program.programId,
+    seller: context.payer.publicKey,
+  });
+
   return {
     expiry,
+    pda,
     ...fixture,
   };
 };
@@ -167,6 +184,26 @@ const fixtureBought = async () => {
   return fixture;
 };
 
+const fixtureExercised = async () => {
+  const fixture = await fixtureBought();
+  const { program, pda, buyer, wsol, context, usdc } = fixture;
+
+  // Create and fund the ata account for the buyer
+  await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
+  await program.methods
+    .exercise()
+    .accounts({
+      mintUnderlying: wsol,
+      mintQuote: usdc,
+      data: pda,
+      buyer: buyer.publicKey,
+    })
+    .signers([buyer])
+    .rpc();
+
+  return fixture;
+};
+
 expect.extend({
   toBeBN: (actual: anchor.BN, expected: anchor.BN) => {
     return {
@@ -181,7 +218,7 @@ expect.extend({
 describe("solana-options", () => {
   describe("initialize instruction", () => {
     it("Can initialize option", async () => {
-      const { context, program, pda, wsol, seller, usdc, buyer } =
+      const { context, program, wsol, seller, usdc, buyer } =
         await fixtureDeployed();
 
       expect(
@@ -189,6 +226,7 @@ describe("solana-options", () => {
       ).to.equal(BigInt(1000));
 
       const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
+      await airdrop(context, seller.publicKey, 1 * LAMPORTS_PER_SOL);
       const tx = await program.methods
         .initialize(
           new anchor.BN("1000"),
@@ -202,6 +240,11 @@ describe("solana-options", () => {
         })
         .rpc();
 
+      const pda = getPda({
+        amountQuote: new anchor.BN("1"),
+        programId: program.programId,
+        seller: context.payer.publicKey,
+      });
       // Check state
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountPremium: null,
@@ -226,8 +269,7 @@ describe("solana-options", () => {
     });
 
     it.skip("Can mint same option twice ", async () => {
-      const { context, program, pda, wsol, seller, usdc, buyer } =
-        await fixtureDeployed();
+      const { context, program, seller, usdc, buyer } = await fixtureDeployed();
 
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
@@ -315,7 +357,7 @@ describe("solana-options", () => {
 
   describe("Buy instruction", () => {
     it("Can successfully buy ", async () => {
-      const { program, pda, seller, buyer, wsol, context, expiry, usdc } =
+      const { program, pda, buyer, wsol, context, expiry, usdc } =
         await fixtureInitialized();
 
       expect(
@@ -430,22 +472,6 @@ describe("solana-options", () => {
           .signers([buyer])
           .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: ata_vault_premium. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized."
-      );
-
-      // Also test when ata is initialized
-      await createAssociatedTokenAccount(context.banksClient, buyer, usdc, pda);
-      await expect(
-        program.methods
-          .buy(new anchor.BN(500))
-          .accounts({
-            data: pda,
-            buyer: buyer.publicKey,
-            mintPremium: usdc,
-          })
-          .signers([buyer])
-          .rpc()
-      ).rejects.toThrowError(
         "AnchorError caused by account: mint_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
@@ -494,7 +520,7 @@ describe("solana-options", () => {
     it("Can successfully exercise", async () => {
       const { program, pda, buyer, wsol, context, usdc } =
         await fixtureBought();
-
+      s;
       // Create and fund the ata account for the buyer
       await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
 
@@ -574,7 +600,7 @@ describe("solana-options", () => {
           .signers([buyer])
           .rpc()
       ).rejects.toThrowError(
-        "Error processing Instruction 0: Provided owner is not allowed"
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionAlreadyExercised. Error Number: 6005. Error Message: Option already exercised./
       );
     });
 
@@ -595,7 +621,7 @@ describe("solana-options", () => {
           .signers([buyer])
           .rpc()
       ).rejects.toThrowError(
-        "AnchorError thrown in programs/solana-options/src/instructions/exercise.rs:64. Error Code: OptionNotPurchased. Error Number: 6003. Error Message: Option was not purchased."
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionNotPurchased. Error Number: 6003. Error Message: Option was not purchased./
       );
     });
 
@@ -694,6 +720,243 @@ describe("solana-options", () => {
           .rpc()
       ).rejects.toThrowError(
         /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionExpired. Error Number: 6001. Error Message: Option has expired./
+      );
+    });
+  });
+
+  describe("Close instruction", () => {
+    it("Can successfully close exercised option by seller", async () => {
+      const { program, pda, buyer, wsol, context, usdc, seller } =
+        await fixtureExercised();
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(10)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(3500)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(0));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(0));
+
+      await fundAtaAccount(context.banksClient, usdc, seller, 0);
+
+      await program.methods
+        .close()
+        .accounts({
+          mintUnderlying: wsol,
+          mintQuote: usdc,
+          data: pda,
+          seller: seller.publicKey,
+        })
+        .signers([seller])
+        .rpc();
+
+      // Expect accounts to be close
+      expect(await context.banksClient.getAccount(pda)).to.equal(null);
+      expect(
+        await context.banksClient.getAccount(
+          token.getAssociatedTokenAddressSync(wsol, pda, true)
+        )
+      ).to.equal(null);
+      expect(
+        await context.banksClient.getAccount(
+          token.getAssociatedTokenAddressSync(usdc, pda, true)
+        )
+      ).to.equal(null);
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(10));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(3500));
+    });
+
+    it("Can successfully close exercised option by anyone", async () => {
+      const { program, pda, buyer, wsol, context, usdc, seller } =
+        await fixtureExercised();
+
+      const keeper = Keypair.generate();
+      await airdrop(context, keeper.publicKey, 1 * LAMPORTS_PER_SOL);
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(10)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(3500)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(0));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(0));
+
+      await fundAtaAccount(context.banksClient, usdc, seller, 0);
+
+      await program.methods
+        .close()
+        .accounts({
+          mintUnderlying: wsol,
+          mintQuote: usdc,
+          data: pda,
+          seller: seller.publicKey,
+          payer: keeper.publicKey,
+        })
+        .signers([keeper])
+        .rpc();
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(10));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(3500));
+    });
+
+    it("Can successfully close unbought option by anyone", async () => {
+      const { program, pda, buyer, wsol, context, usdc, seller } =
+        await fixtureInitialized();
+
+      const keeper = Keypair.generate();
+      await airdrop(context, keeper.publicKey, 1 * LAMPORTS_PER_SOL);
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(1000)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(0));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(0));
+
+      await fundAtaAccount(context.banksClient, usdc, seller, 0);
+
+      await program.methods
+        .close()
+        .accounts({
+          mintUnderlying: wsol,
+          mintQuote: usdc,
+          data: pda,
+          seller: seller.publicKey,
+          payer: keeper.publicKey,
+        })
+        .signers([keeper])
+        .rpc();
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(1000));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(0));
+    });
+
+    it("Can successfully close unexercised option after expiry", async () => {
+      const { program, pda, wsol, context, usdc, seller, expiry } =
+        await fixtureBought();
+
+      await fundAtaAccount(context.banksClient, usdc, seller, 0);
+      await warpTo(context, expiry.add(new anchor.BN(100)));
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(1010)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(0));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(0));
+
+      await program.methods
+        .close()
+        .accounts({
+          mintUnderlying: wsol,
+          mintQuote: usdc,
+          data: pda,
+          seller: seller.publicKey,
+          payer: seller.publicKey,
+        })
+        .signers([seller])
+        .rpc();
+
+      // Expect accounts to be close
+      expect(await context.banksClient.getAccount(pda)).to.equal(null);
+      expect(
+        await context.banksClient.getAccount(
+          token.getAssociatedTokenAddressSync(wsol, pda, true)
+        )
+      ).to.equal(null);
+      expect(
+        await context.banksClient.getAccount(
+          token.getAssociatedTokenAddressSync(usdc, pda, true)
+        )
+      ).to.equal(null);
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
+        BigInt(0)
+      );
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
+      ).to.equal(BigInt(1010));
+      expect(
+        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey)
+      ).to.equal(BigInt(0));
+    });
+
+    it("Can reject closing bought option before expiry", async () => {
+      const { program, pda, wsol, context, usdc, seller } =
+        await fixtureBought();
+
+      await fundAtaAccount(context.banksClient, usdc, seller, 0);
+
+      await expect(
+        program.methods
+          .close()
+          .accounts({
+            mintUnderlying: wsol,
+            mintQuote: usdc,
+            data: pda,
+            seller: seller.publicKey,
+            payer: seller.publicKey,
+          })
+          .signers([seller])
+          .rpc()
+      ).rejects.toThrowError(
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/close.rs:\d\d. Error Code: OptionCannotBeClosedYet. Error Number: 6004. Error Message: Option cannot be closed Yet./
       );
     });
   });

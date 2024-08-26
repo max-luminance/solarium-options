@@ -1,4 +1,3 @@
-
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
@@ -14,7 +13,7 @@ pub struct Exercise<'info> {
     pub buyer: Signer<'info>,
     #[account(
         mut,
-        seeds = ["covered-call".as_bytes(), data.seller.as_ref()],
+        seeds = ["covered-call".as_bytes(), &data.amount_quote.to_le_bytes(), data.seller.as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
         bump = data.bump,
     )]
     pub data: Account<'info, CoveredCall>,
@@ -27,14 +26,14 @@ pub struct Exercise<'info> {
         associated_token::mint = data.mint_underlying,
         associated_token::authority = buyer,
     )]
-    pub ata_buyer_underlying: Account<'info, TokenAccount>, 
+    pub ata_buyer_underlying: Account<'info, TokenAccount>,
     #[account(
         mut,
         constraint = ata_buyer_quote.amount >= data.amount_quote, 
         associated_token::mint = data.mint_quote,
         associated_token::authority = buyer,
     )]
-    pub ata_buyer_quote: Account<'info, TokenAccount>, 
+    pub ata_buyer_quote: Account<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = mint_underlying,
@@ -42,8 +41,7 @@ pub struct Exercise<'info> {
     )]
     pub ata_vault_underlying: Account<'info, TokenAccount>,
     #[account(
-        init,
-        payer = buyer,
+        mut,
         associated_token::mint = mint_quote,
         associated_token::authority = data,
     )]
@@ -62,13 +60,13 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
     );
 
     require!(
-      ctx.accounts.data.amount_premium.is_some(),
-      ErrorCode::OptionNotPurchased
+        ctx.accounts.data.amount_premium.is_some(),
+        ErrorCode::OptionNotPurchased
     );
 
     require!(
-      ctx.accounts.data.is_exercised == false,
-      ErrorCode::OptionNotPurchased
+        ctx.accounts.data.is_exercised == false,
+        ErrorCode::OptionAlreadyExercised
     );
 
     // Transfer quote to vote in underlying to vault
@@ -85,7 +83,7 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         ctx.accounts.data.amount_quote,
         ctx.accounts.mint_quote.decimals,
     )?;
-    
+
     // Transfer underlying from vault to buyer
     transfer_checked(
         CpiContext::new_with_signer(
@@ -96,7 +94,12 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
                 mint: ctx.accounts.mint_underlying.to_account_info(),
                 authority: ctx.accounts.data.to_account_info(),
             },
-            &[&[b"covered-call", ctx.accounts.data.seller.as_ref(), &[ctx.accounts.data.bump]]],
+            &[&[
+                "covered-call".as_bytes(),
+                &ctx.accounts.data.amount_quote.to_le_bytes(),
+                ctx.accounts.data.seller.as_ref(),
+                &[ctx.accounts.data.bump],
+            ]],
         ),
         ctx.accounts.data.amount_underlying,
         ctx.accounts.mint_underlying.decimals,

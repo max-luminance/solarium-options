@@ -10,4 +10,8 @@ pub enum ErrorCode {
     OptionAlreadyBought,
     #[msg("Option was not purchased")]
     OptionNotPurchased,
+    #[msg("Option cannot be closed Yet")]
+    OptionCannotBeClosedYet,
+    #[msg("Option already exercised")]
+    OptionAlreadyExercised,
 }
