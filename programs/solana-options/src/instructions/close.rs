@@ -61,7 +61,7 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
 
     require!(
         clock.unix_timestamp > ctx.accounts.data.expiry_unix_timestamp
-            || ctx.accounts.data.is_exercised == true
+            || ctx.accounts.data.is_exercised
             || ctx.accounts.data.amount_premium.is_none(),
         ErrorCode::OptionCannotBeClosedYet
     );

@@ -22,7 +22,7 @@ pub struct Buy<'info> {
     pub mint_premium: Account<'info, Mint>,
     #[account(
         mut,
-        constraint = ata_buyer_premium.amount >= amount_premium, 
+        constraint = ata_buyer_premium.amount >= amount_premium,
         associated_token::mint = mint_premium,
         associated_token::authority = buyer,
     )]

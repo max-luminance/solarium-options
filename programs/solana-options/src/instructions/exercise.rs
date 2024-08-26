@@ -29,7 +29,7 @@ pub struct Exercise<'info> {
     pub ata_buyer_underlying: Account<'info, TokenAccount>,
     #[account(
         mut,
-        constraint = ata_buyer_quote.amount >= data.amount_quote, 
+        constraint = ata_buyer_quote.amount >= data.amount_quote,
         associated_token::mint = data.mint_quote,
         associated_token::authority = buyer,
     )]

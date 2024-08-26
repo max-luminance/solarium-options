@@ -14,7 +14,7 @@ pub struct Initialize<'info> {
     pub seller: Signer<'info>,
     pub buyer: SystemAccount<'info>,
     #[account(
-        init, 
+        init,
         payer = seller,
         space = 8 + CoveredCall::INIT_SPACE,
         seeds = ["covered-call".as_bytes(), &amount_quote.to_le_bytes(), seller.key().as_ref()], // TODO:- Improve the seed, so can mint many. Do i want to save the seed?
@@ -25,7 +25,7 @@ pub struct Initialize<'info> {
     pub mint_quote: Account<'info, Mint>,
     #[account(
         mut,
-        constraint = ata_seller_underlying.amount >= amount_underlying, 
+        constraint = ata_seller_underlying.amount >= amount_underlying,
         associated_token::mint = mint_underlying,
         associated_token::authority = seller,
     )]
@@ -64,10 +64,10 @@ pub fn handle_initialize(
 
     // Set state
     ctx.accounts.data.set_inner(CoveredCall {
-        amount_quote: amount_quote,
-        amount_underlying: amount_underlying,
+        amount_quote,
+        amount_underlying,
         buyer: ctx.accounts.buyer.key(),
-        expiry_unix_timestamp: expiry_unix_timestamp,
+        expiry_unix_timestamp,
         mint_quote: ctx.accounts.mint_quote.key(),
         mint_underlying: ctx.accounts.mint_underlying.key(),
         seller: ctx.accounts.seller.key(),
