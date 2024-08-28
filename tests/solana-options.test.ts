@@ -18,6 +18,7 @@ import {
   getAccount,
 } from "spl-token-bankrun";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, Signer } from "@solana/web3.js";
+import { getPda } from "./helpers.js";
 
 const authority = anchor.web3.Keypair.generate();
 async function getAtaTokenBalance(
@@ -134,32 +135,6 @@ const fixtureDeployed = async () => {
   };
 };
 
-function getPda(seeds: {
-  amountQuote: anchor.BN;
-  amountUnderlying: anchor.BN;
-  buyer: PublicKey;
-  expiry: anchor.BN;
-  mintQuote: PublicKey;
-  mintUnderlying: PublicKey;
-  programId: PublicKey;
-  seller: PublicKey;
-}) {
-  const [pda] = anchor.web3.PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("covered-call"),
-      seeds.seller.toBuffer(),
-      seeds.buyer.toBuffer(),
-      seeds.mintUnderlying.toBuffer(),
-      seeds.mintQuote.toBuffer(),
-      seeds.amountUnderlying.toArrayLike(Buffer, "le", 8),
-      seeds.amountQuote.toArrayLike(Buffer, "le", 8),
-      seeds.expiry.toArrayLike(Buffer, "le", 8),
-    ],
-    seeds.programId
-  );
-  return pda;
-}
-
 const fixtureInitialized = async () => {
   const fixture = await fixtureDeployed();
   const { context, program, wsol, usdc, buyer } = fixture;
@@ -178,10 +153,10 @@ const fixtureInitialized = async () => {
     .rpc();
 
   const pda = getPda({
-    amountQuote: new anchor.BN("3500"),
-    amountUnderlying: new anchor.BN("1000"),
+    amountQuote: 3500n,
+    amountUnderlying: 1000n,
     buyer: buyer.publicKey,
-    expiry: expiry,
+    expiry: BigInt(expiry.toString()),
     mintQuote: usdc,
     mintUnderlying: wsol,
     programId: program.programId,
@@ -232,17 +207,6 @@ const fixtureExercised = async () => {
   return fixture;
 };
 
-expect.extend({
-  toBeBN: (actual: anchor.BN, expected: anchor.BN) => {
-    return {
-      pass: actual.eq(expected),
-      message: () => `expected ${expected} to be ${actual}`,
-      actual: actual.toString(),
-      expected: expected.toString(),
-    };
-  },
-});
-
 describe("solana-options", () => {
   describe("initialize instruction", () => {
     it("Can initialize option", async () => {
@@ -260,10 +224,10 @@ describe("solana-options", () => {
       ).to.equal(BigInt(1000));
 
       const pda = getPda({
-        amountQuote: new anchor.BN("42"),
-        amountUnderlying: new anchor.BN("1000"),
+        amountQuote: 42n,
+        amountUnderlying: 1000n,
         buyer: buyer.publicKey,
-        expiry: expiry,
+        expiry: BigInt(expiry.toString()),
         mintQuote: usdc,
         mintUnderlying: wsol,
         programId: program.programId,
