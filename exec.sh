@@ -1,14 +1,22 @@
-function resume() {
-  echo "Resuming"
+PROGRAM_ID="3JZ99S1BGfcdExZ4immxWKSGAFkbe3hxZo9NRxvrair4"
+
+function recover() {
+  FILE=./.secrets/recoveries/$(date +"%FT%H%M%S%z").json
+
+  echo "Recovering with $FILE"
   
-  solana-keygen recover -o ./.secrets/recover.json
+  solana-keygen recover -o $FILE
 
   solana program deploy \
     -k ./.secrets/payer.json \
-    --buffer ./.secrets/recover.json \
+    --buffer $FILE \
     --upgrade-authority ./.secrets/payer.json \
     --program-id ./target/deploy/solana_options-keypair.json \
     ./target/deploy/solana_options.so
+}
+
+function extend {
+  solana program extend $PROGRAM_ID 20000 -k ./.secrets/payer.json
 }
 
 # function close() {

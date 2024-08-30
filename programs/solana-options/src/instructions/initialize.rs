@@ -84,6 +84,7 @@ pub fn handle_initialize(
         bump: ctx.bumps.data,
         amount_premium: None,
         is_exercised: false,
+        timestamp_start: clock.unix_timestamp,
     });
 
     // Transfer underlying to vault

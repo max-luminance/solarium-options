@@ -13,4 +13,6 @@ pub struct CoveredCall {
     pub bump: u8,
     pub amount_premium: Option<u64>,
     pub is_exercised: bool,
+    pub timestamp_start: i64,
+
 }

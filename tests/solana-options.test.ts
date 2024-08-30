@@ -263,6 +263,7 @@ describe("solana-options", () => {
         seller: context.payer.publicKey,
         bump: expect.any(Number),
         isExercised: false,
+        timestampStart: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
       });
 
       expect(
@@ -392,6 +393,7 @@ describe("solana-options", () => {
         seller: context.payer.publicKey,
         bump: expect.any(Number),
         isExercised: false,
+        timestampStart: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
       });
 
       expect(
