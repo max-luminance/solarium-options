@@ -93,15 +93,18 @@ const warpTo = async (context: ProgramTestContext, ms: anchor.BN) => {
 };
 const fixtureDeployed = async () => {
   const context = await startAnchor(".", [], []);
-  const provider = new BankrunProvider(context);
+  const payer = context.payer;
+  const buyer = Keypair.generate();
+  const seller = Keypair.generate();
+  await Promise.all([
+    airdrop(context, buyer.publicKey, 1 * LAMPORTS_PER_SOL),
+    airdrop(context, seller.publicKey, 1 * LAMPORTS_PER_SOL),
+  ]);
+
+  const provider = new BankrunProvider(context, new anchor.Wallet(seller));
 
   // @ts-ignore
   const program = new Program<SolanaOptions>(IDL, provider);
-
-  const seller = context.payer;
-  const buyer = Keypair.generate();
-
-  await airdrop(context, buyer.publicKey, 1 * LAMPORTS_PER_SOL);
 
   const [wsol, usdc] = await Promise.all([
     createMint(
@@ -133,12 +136,13 @@ const fixtureDeployed = async () => {
     seller,
     usdc,
     buyer,
+    payer,
   };
 };
 
 const fixtureInitialized = async () => {
   const fixture = await fixtureDeployed();
-  const { context, program, wsol, usdc, buyer } = fixture;
+  const { context, program, wsol, usdc, buyer, seller } = fixture;
   const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
   await program.methods
     .initialize(
@@ -161,7 +165,7 @@ const fixtureInitialized = async () => {
     mintQuote: usdc,
     mintBase: wsol,
     programId: program.programId,
-    seller: context.payer.publicKey,
+    seller: seller.publicKey,
   });
 
   return {
@@ -232,7 +236,7 @@ describe("solana-options", () => {
         mintQuote: usdc,
         mintBase: wsol,
         programId: program.programId,
-        seller: context.payer.publicKey,
+        seller: seller.publicKey,
       });
       const ata = token.getAssociatedTokenAddressSync(wsol, pda, true);
       // await fundAtaAccountWithPayer(context.banksClient, wsol, seller, pda, 0);
@@ -262,7 +266,7 @@ describe("solana-options", () => {
         isExercised: false,
         mintBase: wsol,
         mintQuote: usdc,
-        seller: context.payer.publicKey,
+        seller: seller.publicKey,
         timestampExpiry: expect.toBeBN(expiry),
         timestampCreated: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
       });
@@ -364,8 +368,8 @@ describe("solana-options", () => {
   });
 
   describe("Buy instruction", () => {
-    it("Can successfully buy ", async () => {
-      const { program, pda, buyer, wsol, context, expiry, usdc } =
+    it("Can allow buyer to successfully buy ", async () => {
+      const { program, pda, buyer, wsol, context, expiry, usdc, seller } =
         await fixtureInitialized();
 
       expect(
@@ -392,13 +396,55 @@ describe("solana-options", () => {
         isExercised: false,
         mintBase: wsol,
         mintQuote: usdc,
-        seller: context.payer.publicKey,
+        seller: seller.publicKey,
         timestampCreated: expect.toBeBN(new BN(Date.now() / 1000)),
         timestampExpiry: expect.toBeBN(expiry),
       });
 
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey)
+      ).to.equal(BigInt(990));
+
+      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
+        BigInt(1010)
+      );
+    });
+
+    it.only("Can allow 3rd party to successfully buy for buyer", async () => {
+      const { program, pda, buyer, wsol, context, expiry, usdc, seller } =
+        await fixtureInitialized();
+
+      const keeper = Keypair.generate();
+      await airdrop(context, keeper.publicKey, 1 * LAMPORTS_PER_SOL);
+      await fundAtaAccount(context.banksClient, wsol, keeper, BigInt(1000)),
+        await program.methods
+          .buy(new anchor.BN(10))
+          .accounts({
+            data: pda,
+            buyer: buyer.publicKey,
+            mintPremium: wsol,
+            payer: keeper.publicKey,
+          })
+          .signers([keeper])
+          .rpc();
+
+      // Check state
+      expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
+        amountBase: expect.toBeBN(new BN(1000)),
+        amountPremium: expect.toBeBN(new BN(10)),
+        amountQuote: expect.toBeBN(new BN(3500)),
+        bump: expect.any(Number),
+        buyer: buyer.publicKey,
+        isExercised: false,
+        mintBase: wsol,
+        mintQuote: usdc,
+        seller: seller.publicKey,
+        timestampCreated: expect.toBeBN(new BN(Date.now() / 1000)),
+        timestampExpiry: expect.toBeBN(expiry),
+      });
+
+      expect(
+        await getAtaTokenBalance(context.banksClient, wsol, keeper.publicKey)
       ).to.equal(BigInt(990));
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
@@ -809,7 +855,7 @@ describe("solana-options", () => {
     });
 
     it("Can successfully close exercised option by anyone", async () => {
-      const { program, pda, buyer, wsol, context, usdc, seller } =
+      const { program, pda, buyer, wsol, context, usdc, seller, payer } =
         await fixtureExercised();
 
       const keeper = Keypair.generate();

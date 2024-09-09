@@ -10,8 +10,10 @@ use crate::state::CoveredCall;
 #[derive(Accounts)]
 #[instruction(amount_premium: u64)]
 pub struct Buy<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(mut, constraint = buyer.key() == data.buyer)]
-    pub buyer: Signer<'info>,
+    pub buyer: SystemAccount<'info>,
     #[account(
         mut,
         seeds = [
@@ -33,7 +35,7 @@ pub struct Buy<'info> {
         mut,
         constraint = ata_buyer_premium.amount >= amount_premium,
         associated_token::mint = mint_premium,
-        associated_token::authority = buyer,
+        associated_token::authority = payer,
     )]
     pub ata_buyer_premium: Account<'info, TokenAccount>, // This already exists because we enforce it to be base
     #[account(
@@ -69,7 +71,7 @@ pub fn handle_buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
                 from: ctx.accounts.ata_buyer_premium.to_account_info(),
                 to: ctx.accounts.ata_vault_premium.to_account_info(),
                 mint: ctx.accounts.mint_premium.to_account_info(),
-                authority: ctx.accounts.buyer.to_account_info(),
+                authority: ctx.accounts.payer.to_account_info(),
             },
         ),
         amount_premium,
