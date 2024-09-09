@@ -18,16 +18,16 @@ pub struct Buy<'info> {
             "covered-call".as_bytes(), 
             data.seller.as_ref(),
             buyer.key().as_ref(),
-            data.mint_underlying.as_ref(),
+            data.mint_base.as_ref(),
             data.mint_quote.as_ref(),
-            &data.amount_underlying.to_le_bytes(), 
+            &data.amount_base.to_le_bytes(), 
             &data.amount_quote.to_le_bytes(), 
             &data.expiry_unix_timestamp.to_le_bytes(), 
         ], 
         bump = data.bump,
     )]
     pub data: Account<'info, CoveredCall>,
-    #[account( constraint = mint_premium.key() == data.mint_underlying)]
+    #[account( constraint = mint_premium.key() == data.mint_base)]
     pub mint_premium: Account<'info, Mint>,
     #[account(
         mut,
@@ -35,7 +35,7 @@ pub struct Buy<'info> {
         associated_token::mint = mint_premium,
         associated_token::authority = buyer,
     )]
-    pub ata_buyer_premium: Account<'info, TokenAccount>, // This already exists because we enforce it to be underlying
+    pub ata_buyer_premium: Account<'info, TokenAccount>, // This already exists because we enforce it to be base
     #[account(
         mut,
         associated_token::mint = mint_premium,
@@ -61,7 +61,7 @@ pub fn handle_buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
     );
     ctx.accounts.data.amount_premium = Some(amount_premium);
 
-    // Transfer premium in underlying to vault
+    // Transfer premium in base to vault
     transfer_checked(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),

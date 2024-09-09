@@ -8,7 +8,7 @@ use crate::error::ErrorCode;
 use crate::state::CoveredCall;
 
 #[derive(Accounts)]
-#[instruction(amount_underlying: u64, amount_quote: u64, expiry_unix_timestamp: i64)]
+#[instruction(amount_base: u64, amount_quote: u64, expiry_unix_timestamp: i64)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub seller: Signer<'info>,
@@ -21,31 +21,31 @@ pub struct Initialize<'info> {
             b"covered-call",
             seller.key().as_ref(),
             buyer.key().as_ref(),
-            mint_underlying.key().as_ref(),
+            mint_base.key().as_ref(),
             mint_quote.key().as_ref(),
-            amount_underlying.to_le_bytes().as_ref(),
+            amount_base.to_le_bytes().as_ref(),
             amount_quote.to_le_bytes().as_ref(),
             expiry_unix_timestamp.to_le_bytes().as_ref(),
         ],
         bump,
     )]
     pub data: Account<'info, CoveredCall>,
-    pub mint_underlying: Account<'info, Mint>,
+    pub mint_base: Account<'info, Mint>,
     pub mint_quote: Account<'info, Mint>,
     #[account(
         mut,
-        constraint = ata_seller_underlying.amount >= amount_underlying,
-        associated_token::mint = mint_underlying,
+        constraint = ata_seller_base.amount >= amount_base,
+        associated_token::mint = mint_base,
         associated_token::authority = seller,
     )]
-    pub ata_seller_underlying: Account<'info, TokenAccount>,
+    pub ata_seller_base: Account<'info, TokenAccount>,
     #[account(
         init,
         payer = seller,
-        associated_token::mint = mint_underlying,
+        associated_token::mint = mint_base,
         associated_token::authority = data,
     )]
-    pub ata_vault_underlying: Account<'info, TokenAccount>,
+    pub ata_vault_base: Account<'info, TokenAccount>,
     // Can't figure out why i can't init this account here
     // #[account(
     //     init,
@@ -61,7 +61,7 @@ pub struct Initialize<'info> {
 
 pub fn handle_initialize(
     ctx: Context<Initialize>,
-    amount_underlying: u64,
+    amount_base: u64,
     amount_quote: u64,
     expiry_unix_timestamp: i64,
 ) -> Result<()> {
@@ -75,11 +75,11 @@ pub fn handle_initialize(
     // Set state
     ctx.accounts.data.set_inner(CoveredCall {
         amount_quote,
-        amount_underlying,
+        amount_base,
         buyer: ctx.accounts.buyer.key(),
         expiry_unix_timestamp,
         mint_quote: ctx.accounts.mint_quote.key(),
-        mint_underlying: ctx.accounts.mint_underlying.key(),
+        mint_base: ctx.accounts.mint_base.key(),
         seller: ctx.accounts.seller.key(),
         bump: ctx.bumps.data,
         amount_premium: None,
@@ -87,19 +87,19 @@ pub fn handle_initialize(
         timestamp_start: clock.unix_timestamp,
     });
 
-    // Transfer underlying to vault
+    // Transfer base to vault
     transfer_checked(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
-                from: ctx.accounts.ata_seller_underlying.to_account_info(),
-                to: ctx.accounts.ata_vault_underlying.to_account_info(),
-                mint: ctx.accounts.mint_underlying.to_account_info(),
+                from: ctx.accounts.ata_seller_base.to_account_info(),
+                to: ctx.accounts.ata_vault_base.to_account_info(),
+                mint: ctx.accounts.mint_base.to_account_info(),
                 authority: ctx.accounts.seller.to_account_info(),
             },
         ),
-        amount_underlying,
-        ctx.accounts.mint_underlying.decimals,
+        amount_base,
+        ctx.accounts.mint_base.decimals,
     )?;
 
     Ok(())

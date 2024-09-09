@@ -17,25 +17,25 @@ pub struct Exercise<'info> {
             "covered-call".as_bytes(), 
             data.seller.as_ref(),
             buyer.key().as_ref(),
-            mint_underlying.key().as_ref(),
+            mint_base.key().as_ref(),
             mint_quote.key().as_ref(),
-            &data.amount_underlying.to_le_bytes(), 
+            &data.amount_base.to_le_bytes(), 
             &data.amount_quote.to_le_bytes(), 
             &data.expiry_unix_timestamp.to_le_bytes(), 
         ],
         bump = data.bump,
     )]
     pub data: Account<'info, CoveredCall>,
-    #[account( constraint = mint_underlying.key() == data.mint_underlying)]
-    pub mint_underlying: Account<'info, Mint>,
+    #[account( constraint = mint_base.key() == data.mint_base)]
+    pub mint_base: Account<'info, Mint>,
     #[account( constraint = mint_quote.key() == data.mint_quote)]
     pub mint_quote: Account<'info, Mint>,
     #[account(
         mut,
-        associated_token::mint = data.mint_underlying,
+        associated_token::mint = data.mint_base,
         associated_token::authority = buyer,
     )]
-    pub ata_buyer_underlying: Account<'info, TokenAccount>,
+    pub ata_buyer_base: Account<'info, TokenAccount>,
     #[account(
         mut,
         constraint = ata_buyer_quote.amount >= data.amount_quote,
@@ -45,10 +45,10 @@ pub struct Exercise<'info> {
     pub ata_buyer_quote: Account<'info, TokenAccount>,
     #[account(
         mut,
-        associated_token::mint = mint_underlying,
+        associated_token::mint = mint_base,
         associated_token::authority = data,
     )]
-    pub ata_vault_underlying: Account<'info, TokenAccount>,
+    pub ata_vault_base: Account<'info, TokenAccount>,
     #[account(
         init_if_needed,
         payer = buyer,
@@ -83,16 +83,16 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         "covered-call".as_bytes(), 
         ctx.accounts.data.seller.as_ref(),
         ctx.accounts.data.buyer.as_ref(),
-        ctx.accounts.data.mint_underlying.as_ref(),
+        ctx.accounts.data.mint_base.as_ref(),
         ctx.accounts.data.mint_quote.as_ref(),
-        &ctx.accounts.data.amount_underlying.to_le_bytes(), 
+        &ctx.accounts.data.amount_base.to_le_bytes(), 
         &ctx.accounts.data.amount_quote.to_le_bytes(), 
         &ctx.accounts.data.expiry_unix_timestamp.to_le_bytes(), 
         &[ctx.accounts.data.bump],
     ];
     let signer = &[&seeds[..]];
 
-    // Transfer quote to vote in underlying to vault
+    // Transfer quote to vault
     transfer_checked(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -107,20 +107,20 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         ctx.accounts.mint_quote.decimals,
     )?;
 
-    // Transfer underlying from vault to buyer
+    // Transfer base from vault to buyer
     transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
-                from: ctx.accounts.ata_vault_underlying.to_account_info(),
-                to: ctx.accounts.ata_buyer_underlying.to_account_info(),
-                mint: ctx.accounts.mint_underlying.to_account_info(),
+                from: ctx.accounts.ata_vault_base.to_account_info(),
+                to: ctx.accounts.ata_buyer_base.to_account_info(),
+                mint: ctx.accounts.mint_base.to_account_info(),
                 authority: ctx.accounts.data.to_account_info(),
             },
             signer,
         ),
-        ctx.accounts.data.amount_underlying,
-        ctx.accounts.mint_underlying.decimals,
+        ctx.accounts.data.amount_base,
+        ctx.accounts.mint_base.decimals,
     )?;
 
     ctx.accounts.data.is_exercised = true;

@@ -29,10 +29,10 @@ pub mod solana_options {
 
     pub fn initialize(
         ctx: Context<Initialize>,
-        amount_underlying: u64,
+        amount_base: u64,
         amount_quote: u64,
         expiry_unix_timestamp: i64,
     ) -> Result<()> {
-        handle_initialize(ctx, amount_underlying, amount_quote, expiry_unix_timestamp)
+        handle_initialize(ctx, amount_base, amount_quote, expiry_unix_timestamp)
     }
 }

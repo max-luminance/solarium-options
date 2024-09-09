@@ -14,12 +14,12 @@ expect.extend({
 });
 
 export function getPda(seeds: {
+  amountBase: bigint;
   amountQuote: bigint;
-  amountUnderlying: bigint;
   buyer: PublicKey;
   expiry: bigint;
+  mintBase: PublicKey;
   mintQuote: PublicKey;
-  mintUnderlying: PublicKey;
   programId: PublicKey;
   seller: PublicKey;
 }) {
@@ -28,9 +28,9 @@ export function getPda(seeds: {
       Buffer.from("covered-call"),
       seeds.seller.toBuffer(),
       seeds.buyer.toBuffer(),
-      seeds.mintUnderlying.toBuffer(),
+      seeds.mintBase.toBuffer(),
       seeds.mintQuote.toBuffer(),
-      new BN(seeds.amountUnderlying.toString()).toArrayLike(Buffer, "le", 8),
+      new BN(seeds.amountBase.toString()).toArrayLike(Buffer, "le", 8),
       new BN(seeds.amountQuote.toString()).toArrayLike(Buffer, "le", 8),
       new BN(seeds.expiry.toString()).toArrayLike(Buffer, "le", 8),
     ],

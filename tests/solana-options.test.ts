@@ -146,7 +146,7 @@ const fixtureInitialized = async () => {
       new anchor.BN(expiry)
     )
     .accounts({
-      mintUnderlying: wsol,
+      mintBase: wsol,
       mintQuote: usdc,
       buyer: buyer.publicKey,
     })
@@ -154,11 +154,11 @@ const fixtureInitialized = async () => {
 
   const pda = getPda({
     amountQuote: 3500n,
-    amountUnderlying: 1000n,
+    amountBase: 1000n,
     buyer: buyer.publicKey,
     expiry: BigInt(expiry.toString()),
     mintQuote: usdc,
-    mintUnderlying: wsol,
+    mintBase: wsol,
     programId: program.programId,
     seller: context.payer.publicKey,
   });
@@ -196,7 +196,7 @@ const fixtureExercised = async () => {
   await program.methods
     .exercise()
     .accounts({
-      mintUnderlying: wsol,
+      mintBase: wsol,
       mintQuote: usdc,
       data: pda,
       buyer: buyer.publicKey,
@@ -225,11 +225,11 @@ describe("solana-options", () => {
 
       const pda = getPda({
         amountQuote: 42n,
-        amountUnderlying: 1000n,
+        amountBase: 1000n,
         buyer: buyer.publicKey,
         expiry: BigInt(expiry.toString()),
         mintQuote: usdc,
-        mintUnderlying: wsol,
+        mintBase: wsol,
         programId: program.programId,
         seller: context.payer.publicKey,
       });
@@ -244,7 +244,7 @@ describe("solana-options", () => {
         .accounts({
           buyer: buyer.publicKey,
           mintQuote: usdc,
-          mintUnderlying: wsol,
+          mintBase: wsol,
           seller: seller.publicKey,
           // data: pda,
         })
@@ -255,11 +255,11 @@ describe("solana-options", () => {
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountPremium: null,
         amountQuote: expect.toBeBN(new anchor.BN(42)),
-        amountUnderlying: expect.toBeBN(new anchor.BN(1000)),
+        amountBase: expect.toBeBN(new anchor.BN(1000)),
         buyer: buyer.publicKey,
         expiryUnixTimestamp: expect.toBeBN(expiry),
         mintQuote: usdc,
-        mintUnderlying: wsol,
+        mintBase: wsol,
         seller: context.payer.publicKey,
         bump: expect.any(Number),
         isExercised: false,
@@ -290,7 +290,7 @@ describe("solana-options", () => {
           new anchor.BN(expiry)
         )
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           buyer: buyer.publicKey,
         })
@@ -303,7 +303,7 @@ describe("solana-options", () => {
           new anchor.BN(expiry)
         )
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           buyer: buyer.publicKey,
         })
@@ -326,7 +326,7 @@ describe("solana-options", () => {
             new anchor.BN(Math.floor(Date.now() / 1000) - 600)
           )
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             buyer: buyer.publicKey,
           })
@@ -335,7 +335,7 @@ describe("solana-options", () => {
         /^AnchorError thrown in programs\/solana-options\/src\/instructions\/initialize.rs:\d+. Error Code: ExpiryIsInThePast. Error Number: 6000. Error Message: Expiry is in the past.$/
       );
     });
-    it("Can reject initialize with insufficient underlying", async () => {
+    it("Can reject initialize with insufficient base", async () => {
       const { context, program, wsol, seller, usdc, buyer } =
         await fixtureDeployed();
 
@@ -351,13 +351,13 @@ describe("solana-options", () => {
             new anchor.BN(Math.floor(Date.now() / 1000) + 60)
           )
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             buyer: buyer.publicKey,
           })
           .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: ata_seller_underlying. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
+        "AnchorError caused by account: ata_seller_base. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
   });
@@ -384,12 +384,12 @@ describe("solana-options", () => {
       // Check state
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountQuote: expect.toBeBN(new anchor.BN(3500)),
-        amountUnderlying: expect.toBeBN(new anchor.BN(1000)),
+        amountBase: expect.toBeBN(new anchor.BN(1000)),
         amountPremium: expect.toBeBN(new anchor.BN(10)),
         buyer: buyer.publicKey,
         expiryUnixTimestamp: expect.toBeBN(expiry),
         mintQuote: usdc,
-        mintUnderlying: wsol,
+        mintBase: wsol,
         seller: context.payer.publicKey,
         bump: expect.any(Number),
         isExercised: false,
@@ -459,7 +459,7 @@ describe("solana-options", () => {
       );
     });
 
-    it("Can reject buy if premium is not in underlying", async () => {
+    it("Can reject buy if premium is not in base", async () => {
       const { program, pda, seller, buyer, wsol, context, usdc } =
         await fixtureInitialized();
 
@@ -565,7 +565,7 @@ describe("solana-options", () => {
       await program.methods
         .exercise()
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           data: pda,
           buyer: buyer.publicKey,
@@ -601,7 +601,7 @@ describe("solana-options", () => {
       await program.methods
         .exercise()
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           data: pda,
           buyer: buyer.publicKey,
@@ -616,7 +616,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: buyer.publicKey,
@@ -637,7 +637,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: buyer.publicKey,
@@ -656,7 +656,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: buyer.publicKey,
@@ -676,7 +676,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: buyer.publicKey,
@@ -696,7 +696,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: seller.publicKey,
@@ -712,7 +712,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: seller.publicKey,
@@ -735,7 +735,7 @@ describe("solana-options", () => {
         program.methods
           .exercise()
           .accounts({
-            mintUnderlying: wsol,
+            mintBase: wsol,
             mintQuote: usdc,
             data: pda,
             buyer: buyer.publicKey,
@@ -771,7 +771,7 @@ describe("solana-options", () => {
       await program.methods
         .close()
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
@@ -832,7 +832,7 @@ describe("solana-options", () => {
       await program.methods
         .close()
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
@@ -881,7 +881,7 @@ describe("solana-options", () => {
       await program.methods
         .close()
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
@@ -928,7 +928,7 @@ describe("solana-options", () => {
       await program.methods
         .close()
         .accounts({
-          mintUnderlying: wsol,
+          mintBase: wsol,
           mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
@@ -978,7 +978,7 @@ describe("solana-options", () => {
             buyer: buyer.publicKey,
             data: pda,
             mintQuote: usdc,
-            mintUnderlying: wsol,
+            mintBase: wsol,
             payer: seller.publicKey,
             seller: seller.publicKey,
           })

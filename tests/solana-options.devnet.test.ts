@@ -93,7 +93,7 @@ describe.skip(
     sequential: true,
   },
   () => {
-    const amountUnderlying = parseUnits("0.1", 9);
+    const amountBase = parseUnits("0.1", 9);
     const amountQuote = parseUnits("0.01", 6);
     const amountPremium = parseUnits("0.02", 9);
 
@@ -119,11 +119,11 @@ describe.skip(
     );
     const pda = getPda({
       amountQuote: amountQuote,
-      amountUnderlying: amountUnderlying,
+      amountBase: amountBase,
       buyer: buyer.publicKey,
       expiry: BigInt(expiry.toString()),
       mintQuote: usdc,
-      mintUnderlying: NATIVE_MINT,
+      mintBase: NATIVE_MINT,
       programId: programId,
       seller: provider.wallet.publicKey,
     });
@@ -162,12 +162,12 @@ describe.skip(
         log("Requested airdrop to payer", sig);
       }
       const gas = parseUnits("0.1", 9);
-      if (solSeller < amountUnderlying + gas) {
+      if (solSeller < amountBase + gas) {
         const tx = new Transaction().add(
           SystemProgram.transfer({
             fromPubkey: payer.publicKey,
             toPubkey: seller.publicKey,
-            lamports: amountUnderlying + gas - solSeller,
+            lamports: amountBase + gas - solSeller,
           })
         );
         tx.feePayer = payer.publicKey;
@@ -247,7 +247,7 @@ describe.skip(
     it("Can initialize option", async () => {
       const tx = await program.methods
         .initialize(
-          new BN(amountUnderlying.toString()),
+          new BN(amountBase.toString()),
           new BN(amountQuote.toString()),
           expiry
         )
@@ -261,14 +261,14 @@ describe.skip(
           SystemProgram.transfer({
             fromPubkey: seller.publicKey,
             toPubkey: ataSellerSol,
-            lamports: amountUnderlying,
+            lamports: amountBase,
           }),
           createSyncNativeInstruction(ataSellerSol),
         ])
         .accounts({
           buyer: buyer.publicKey,
           mintQuote: usdc,
-          mintUnderlying: NATIVE_MINT,
+          mintBase: NATIVE_MINT,
           seller: seller.publicKey,
         })
         .postInstructions([
@@ -286,16 +286,16 @@ describe.skip(
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountPremium: null,
         amountQuote: expect.toBeBN(new BN(amountQuote.toString())),
-        amountUnderlying: expect.toBeBN(new BN(amountUnderlying.toString())),
+        amountBase: expect.toBeBN(new BN(amountBase.toString())),
         buyer: buyer.publicKey,
         expiryUnixTimestamp: expect.toBeBN(expiry),
         mintQuote: usdc,
-        mintUnderlying: NATIVE_MINT,
+        mintBase: NATIVE_MINT,
         seller: seller.publicKey,
         bump: expect.any(Number),
         isExercised: false,
+        timestampStart: expect.any(BN),
       });
-      // expect(true).toBe(true);
     });
 
     it("Can buy option", async () => {
@@ -336,14 +336,15 @@ describe.skip(
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountPremium: expect.toBeBN(new BN(amountPremium.toString())),
         amountQuote: expect.toBeBN(new BN(amountQuote.toString())),
-        amountUnderlying: expect.toBeBN(new BN(amountUnderlying.toString())),
+        amountBase: expect.toBeBN(new BN(amountBase.toString())),
         buyer: buyer.publicKey,
         expiryUnixTimestamp: expect.toBeBN(expiry),
         mintQuote: usdc,
-        mintUnderlying: NATIVE_MINT,
+        mintBase: NATIVE_MINT,
         seller: seller.publicKey,
         bump: expect.any(Number),
         isExercised: false,
+        timestampStart: expect.any(BN),
       });
     });
 
@@ -359,7 +360,7 @@ describe.skip(
           ),
         ])
         .accounts({
-          mintUnderlying: NATIVE_MINT,
+          mintBase: NATIVE_MINT,
           mintQuote: usdc,
           data: pda,
           buyer: buyer.publicKey,
@@ -379,14 +380,15 @@ describe.skip(
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
         amountPremium: expect.toBeBN(new BN(amountPremium.toString())),
         amountQuote: expect.toBeBN(new BN(amountQuote.toString())),
-        amountUnderlying: expect.toBeBN(new BN(amountUnderlying.toString())),
+        amountBase: expect.toBeBN(new BN(amountBase.toString())),
         buyer: buyer.publicKey,
         expiryUnixTimestamp: expect.toBeBN(expiry),
         mintQuote: usdc,
-        mintUnderlying: NATIVE_MINT,
+        mintBase: NATIVE_MINT,
         seller: seller.publicKey,
         bump: expect.any(Number),
         isExercised: true,
+        timestampStart: expect.any(BN),
       });
     });
 
@@ -402,7 +404,7 @@ describe.skip(
           ),
         ])
         .accounts({
-          mintUnderlying: NATIVE_MINT,
+          mintBase: NATIVE_MINT,
           mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
@@ -427,7 +429,7 @@ describe.skip(
         SystemProgram.transfer({
           fromPubkey: buyer.publicKey,
           toPubkey: seller.publicKey,
-          lamports: amountUnderlying - amountPremium,
+          lamports: amountBase - amountPremium,
         }),
         createTransferInstruction(
           ataSellerQuote,

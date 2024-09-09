@@ -23,9 +23,9 @@ pub struct Close<'info> {
             "covered-call".as_bytes(), 
             seller.key().as_ref(),
             buyer.key().as_ref(),
-            mint_underlying.key().as_ref(),
+            mint_base.key().as_ref(),
             mint_quote.key().as_ref(),
-            &data.amount_underlying.to_le_bytes(), 
+            &data.amount_base.to_le_bytes(), 
             &data.amount_quote.to_le_bytes(), 
             &data.expiry_unix_timestamp.to_le_bytes(), 
         ],
@@ -33,16 +33,16 @@ pub struct Close<'info> {
         close = seller,
     )]
     pub data: Account<'info, CoveredCall>,
-    #[account( constraint = mint_underlying.key() == data.mint_underlying)]
-    pub mint_underlying: Account<'info, Mint>,
+    #[account( constraint = mint_base.key() == data.mint_base)]
+    pub mint_base: Account<'info, Mint>,
     #[account( constraint = mint_quote.key() == data.mint_quote)]
     pub mint_quote: Account<'info, Mint>,
     #[account(
         mut,
-        associated_token::mint = data.mint_underlying,
+        associated_token::mint = data.mint_base,
         associated_token::authority = seller,
     )]
-    pub ata_seller_underlying: Account<'info, TokenAccount>,
+    pub ata_seller_base: Account<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = data.mint_quote,
@@ -51,10 +51,10 @@ pub struct Close<'info> {
     pub ata_seller_quote: Account<'info, TokenAccount>,
     #[account(
         mut,
-        associated_token::mint = mint_underlying,
+        associated_token::mint = mint_base,
         associated_token::authority = data,
     )]
-    pub ata_vault_underlying: Account<'info, TokenAccount>,
+    pub ata_vault_base: Account<'info, TokenAccount>,
     #[account(
         init_if_needed,
         payer = payer,
@@ -74,9 +74,9 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
         "covered-call".as_bytes(), 
         ctx.accounts.data.seller.as_ref(),
         ctx.accounts.data.buyer.as_ref(),
-        ctx.accounts.data.mint_underlying.as_ref(),
+        ctx.accounts.data.mint_base.as_ref(),
         ctx.accounts.data.mint_quote.as_ref(),
-        &ctx.accounts.data.amount_underlying.to_le_bytes(), 
+        &ctx.accounts.data.amount_base.to_le_bytes(), 
         &ctx.accounts.data.amount_quote.to_le_bytes(), 
         &ctx.accounts.data.expiry_unix_timestamp.to_le_bytes(), 
         &[ctx.accounts.data.bump],
@@ -90,21 +90,21 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
         ErrorCode::OptionCannotBeClosedYet
     );
 
-    // Transfer underlying to seller
-    if ctx.accounts.ata_vault_underlying.amount > 0 {
+    // Transfer base to seller
+    if ctx.accounts.ata_vault_base.amount > 0 {
         transfer_checked(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 TransferChecked {
-                    from: ctx.accounts.ata_vault_underlying.to_account_info(),
-                    to: ctx.accounts.ata_seller_underlying.to_account_info(),
-                    mint: ctx.accounts.mint_underlying.to_account_info(),
+                    from: ctx.accounts.ata_vault_base.to_account_info(),
+                    to: ctx.accounts.ata_seller_base.to_account_info(),
+                    mint: ctx.accounts.mint_base.to_account_info(),
                     authority: ctx.accounts.data.to_account_info(),
                 },
                 signer,
             ),
-            ctx.accounts.ata_vault_underlying.amount,
-            ctx.accounts.mint_underlying.decimals,
+            ctx.accounts.ata_vault_base.amount,
+            ctx.accounts.mint_base.decimals,
         )?;
     }
 
@@ -129,7 +129,7 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
     close_account(CpiContext::new_with_signer(
         ctx.accounts.token_program.to_account_info(),
         CloseAccount {
-            account: ctx.accounts.ata_vault_underlying.to_account_info(),
+            account: ctx.accounts.ata_vault_base.to_account_info(),
             destination: ctx.accounts.seller.to_account_info(),
             authority: ctx.accounts.data.to_account_info(),
         },
