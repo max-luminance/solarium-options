@@ -31,8 +31,8 @@ pub mod solana_options {
         ctx: Context<Initialize>,
         amount_base: u64,
         amount_quote: u64,
-        expiry_unix_timestamp: i64,
+        timestamp_expiry: i64,
     ) -> Result<()> {
-        handle_initialize(ctx, amount_base, amount_quote, expiry_unix_timestamp)
+        handle_initialize(ctx, amount_base, amount_quote, timestamp_expiry)
     }
 }

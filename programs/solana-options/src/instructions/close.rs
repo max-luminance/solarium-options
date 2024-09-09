@@ -27,7 +27,7 @@ pub struct Close<'info> {
             mint_quote.key().as_ref(),
             &data.amount_base.to_le_bytes(), 
             &data.amount_quote.to_le_bytes(), 
-            &data.expiry_unix_timestamp.to_le_bytes(), 
+            &data.timestamp_expiry.to_le_bytes(), 
         ],
         bump = data.bump,
         close = seller,
@@ -78,13 +78,13 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
         ctx.accounts.data.mint_quote.as_ref(),
         &ctx.accounts.data.amount_base.to_le_bytes(), 
         &ctx.accounts.data.amount_quote.to_le_bytes(), 
-        &ctx.accounts.data.expiry_unix_timestamp.to_le_bytes(), 
+        &ctx.accounts.data.timestamp_expiry.to_le_bytes(), 
         &[ctx.accounts.data.bump],
     ];
     let signer = &[&seeds[..]];
 
     require!(
-        clock.unix_timestamp > ctx.accounts.data.expiry_unix_timestamp
+        clock.unix_timestamp > ctx.accounts.data.timestamp_expiry
             || ctx.accounts.data.is_exercised
             || ctx.accounts.data.amount_premium.is_none(),
         ErrorCode::OptionCannotBeClosedYet

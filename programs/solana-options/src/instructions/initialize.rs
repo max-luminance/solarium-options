@@ -8,7 +8,7 @@ use crate::error::ErrorCode;
 use crate::state::CoveredCall;
 
 #[derive(Accounts)]
-#[instruction(amount_base: u64, amount_quote: u64, expiry_unix_timestamp: i64)]
+#[instruction(amount_base: u64, amount_quote: u64, timestamp_expiry: i64)]
 pub struct Initialize<'info> {
     #[account(mut)]
     pub seller: Signer<'info>,
@@ -25,7 +25,7 @@ pub struct Initialize<'info> {
             mint_quote.key().as_ref(),
             amount_base.to_le_bytes().as_ref(),
             amount_quote.to_le_bytes().as_ref(),
-            expiry_unix_timestamp.to_le_bytes().as_ref(),
+            timestamp_expiry.to_le_bytes().as_ref(),
         ],
         bump,
     )]
@@ -63,28 +63,28 @@ pub fn handle_initialize(
     ctx: Context<Initialize>,
     amount_base: u64,
     amount_quote: u64,
-    expiry_unix_timestamp: i64,
+    timestamp_expiry: i64,
 ) -> Result<()> {
     let clock = Clock::get()?;
 
     require!(
-        expiry_unix_timestamp > clock.unix_timestamp,
+        timestamp_expiry > clock.unix_timestamp,
         ErrorCode::ExpiryIsInThePast
     );
 
     // Set state
     ctx.accounts.data.set_inner(CoveredCall {
-        amount_quote,
         amount_base,
-        buyer: ctx.accounts.buyer.key(),
-        expiry_unix_timestamp,
-        mint_quote: ctx.accounts.mint_quote.key(),
-        mint_base: ctx.accounts.mint_base.key(),
-        seller: ctx.accounts.seller.key(),
-        bump: ctx.bumps.data,
         amount_premium: None,
+        amount_quote,
+        bump: ctx.bumps.data,
+        buyer: ctx.accounts.buyer.key(),
         is_exercised: false,
-        timestamp_start: clock.unix_timestamp,
+        mint_base: ctx.accounts.mint_base.key(),
+        mint_quote: ctx.accounts.mint_quote.key(),
+        seller: ctx.accounts.seller.key(),
+        timestamp_created: clock.unix_timestamp,
+        timestamp_expiry,
     });
 
     // Transfer base to vault

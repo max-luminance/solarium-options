@@ -77,7 +77,7 @@ const programId = new PublicKey("3JZ99S1BGfcdExZ4immxWKSGAFkbe3hxZo9NRxvrair4");
 //     amountQuote: a.account.amountQuote,
 //     amountUnderlying: a.account.amountUnderlying,
 //     buyer: a.account.buyer,
-//     expiryUnixTimestamp: a.account.expiryUnixTimestamp,
+//     timestampExpiry: a.account.timestampExpiry,
 //     mintQuote: a.account.mintQuote,
 //     mintUnderlying: a.account.mintUnderlying,
 //     seller: a.account.seller,
@@ -288,13 +288,13 @@ describe.skip(
         amountQuote: expect.toBeBN(new BN(amountQuote.toString())),
         amountBase: expect.toBeBN(new BN(amountBase.toString())),
         buyer: buyer.publicKey,
-        expiryUnixTimestamp: expect.toBeBN(expiry),
+        timestampExpiry: expect.toBeBN(expiry),
         mintQuote: usdc,
         mintBase: NATIVE_MINT,
         seller: seller.publicKey,
         bump: expect.any(Number),
         isExercised: false,
-        timestampStart: expect.any(BN),
+        timestampCreated: expect.any(BN),
       });
     });
 
@@ -338,13 +338,13 @@ describe.skip(
         amountQuote: expect.toBeBN(new BN(amountQuote.toString())),
         amountBase: expect.toBeBN(new BN(amountBase.toString())),
         buyer: buyer.publicKey,
-        expiryUnixTimestamp: expect.toBeBN(expiry),
+        timestampExpiry: expect.toBeBN(expiry),
         mintQuote: usdc,
         mintBase: NATIVE_MINT,
         seller: seller.publicKey,
         bump: expect.any(Number),
         isExercised: false,
-        timestampStart: expect.any(BN),
+        timestampCreated: expect.any(BN),
       });
     });
 
@@ -382,13 +382,13 @@ describe.skip(
         amountQuote: expect.toBeBN(new BN(amountQuote.toString())),
         amountBase: expect.toBeBN(new BN(amountBase.toString())),
         buyer: buyer.publicKey,
-        expiryUnixTimestamp: expect.toBeBN(expiry),
+        timestampExpiry: expect.toBeBN(expiry),
         mintQuote: usdc,
         mintBase: NATIVE_MINT,
         seller: seller.publicKey,
         bump: expect.any(Number),
         isExercised: true,
-        timestampStart: expect.any(BN),
+        timestampCreated: expect.any(BN),
       });
     });
 

@@ -11,6 +11,7 @@ import * as token from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { SolanaOptions } from "../target/types/solana_options.js";
 import IDL from "../target/idl/solana_options.json";
+import BN from "bn.js";
 import {
   createMint,
   createAssociatedTokenAccount,
@@ -253,17 +254,17 @@ describe("solana-options", () => {
 
       // Check state
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
+        amountBase: expect.toBeBN(new anchor.BN(1000)),
         amountPremium: null,
         amountQuote: expect.toBeBN(new anchor.BN(42)),
-        amountBase: expect.toBeBN(new anchor.BN(1000)),
-        buyer: buyer.publicKey,
-        expiryUnixTimestamp: expect.toBeBN(expiry),
-        mintQuote: usdc,
-        mintBase: wsol,
-        seller: context.payer.publicKey,
         bump: expect.any(Number),
+        buyer: buyer.publicKey,
         isExercised: false,
-        timestampStart: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
+        mintBase: wsol,
+        mintQuote: usdc,
+        seller: context.payer.publicKey,
+        timestampExpiry: expect.toBeBN(expiry),
+        timestampCreated: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
       });
 
       expect(
@@ -383,17 +384,17 @@ describe("solana-options", () => {
 
       // Check state
       expect(await program.account.coveredCall.fetch(pda)).toStrictEqual({
-        amountQuote: expect.toBeBN(new anchor.BN(3500)),
-        amountBase: expect.toBeBN(new anchor.BN(1000)),
-        amountPremium: expect.toBeBN(new anchor.BN(10)),
-        buyer: buyer.publicKey,
-        expiryUnixTimestamp: expect.toBeBN(expiry),
-        mintQuote: usdc,
-        mintBase: wsol,
-        seller: context.payer.publicKey,
+        amountBase: expect.toBeBN(new BN(1000)),
+        amountPremium: expect.toBeBN(new BN(10)),
+        amountQuote: expect.toBeBN(new BN(3500)),
         bump: expect.any(Number),
+        buyer: buyer.publicKey,
         isExercised: false,
-        timestampStart: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
+        mintBase: wsol,
+        mintQuote: usdc,
+        seller: context.payer.publicKey,
+        timestampCreated: expect.toBeBN(new BN(Date.now() / 1000)),
+        timestampExpiry: expect.toBeBN(expiry),
       });
 
       expect(

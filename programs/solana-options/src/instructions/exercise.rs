@@ -21,7 +21,7 @@ pub struct Exercise<'info> {
             mint_quote.key().as_ref(),
             &data.amount_base.to_le_bytes(), 
             &data.amount_quote.to_le_bytes(), 
-            &data.expiry_unix_timestamp.to_le_bytes(), 
+            &data.timestamp_expiry.to_le_bytes(), 
         ],
         bump = data.bump,
     )]
@@ -65,7 +65,7 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
     let clock = Clock::get()?;
 
     require!(
-        clock.unix_timestamp <= ctx.accounts.data.expiry_unix_timestamp,
+        clock.unix_timestamp <= ctx.accounts.data.timestamp_expiry,
         ErrorCode::OptionExpired
     );
 
@@ -87,7 +87,7 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         ctx.accounts.data.mint_quote.as_ref(),
         &ctx.accounts.data.amount_base.to_le_bytes(), 
         &ctx.accounts.data.amount_quote.to_le_bytes(), 
-        &ctx.accounts.data.expiry_unix_timestamp.to_le_bytes(), 
+        &ctx.accounts.data.timestamp_expiry.to_le_bytes(), 
         &[ctx.accounts.data.bump],
     ];
     let signer = &[&seeds[..]];

@@ -1,11 +1,11 @@
 import { expect } from "vitest";
-import { BN } from "@coral-xyz/anchor";
+import BN from "bn.js";
 import { PublicKey } from "@solana/web3.js";
 
 expect.extend({
   toBeBN: (actual: BN, expected: BN) => {
     return {
-      pass: actual.eq(expected),
+      pass: expected.eq(actual),
       message: () => `expected ${expected} to be ${actual}`,
       actual: actual.toString(),
       expected: expected.toString(),

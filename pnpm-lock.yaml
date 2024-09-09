@@ -17,6 +17,9 @@ dependencies:
   anchor-bankrun:
     specifier: 0.4.0
     version: 0.4.0(@coral-xyz/anchor@0.30.1)(@solana/web3.js@1.91.9)(solana-bankrun@0.3.0)
+  bn.js:
+    specifier: ^5.2.1
+    version: 5.2.1
   solana-bankrun:
     specifier: 0.3.0
     version: 0.3.0
