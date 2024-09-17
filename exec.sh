@@ -1,31 +1,41 @@
-PROGRAM_ID="3JZ99S1BGfcdExZ4immxWKSGAFkbe3hxZo9NRxvrair4"
+KEY=$(mktemp)
+
+## Function to remove decrypted key
+function cleanup {
+  rm -f $KEY
+  echo "Cleaned up. Exiting..."
+}
+
+## Wrapper function to decrypt key and run solana command
+function cli() {
+  # Decrypt key
+  gpg --decrypt --quiet ./.secrets/mainnet/deployer.json.gpg > $KEY
+  echo "Decrypted key"
+  trap cleanup EXIT
+
+  # Run solana command with decrypted key
+  solana -k $KEY ${@}
+}
+
+# deploy ./target/deploy/solana_options.so
+function deploy() {
+  cli program deploy ${@}
+}
 
 function recover() {
+  decrypt
   FILE=./.secrets/recoveries/$(date +"%FT%H%M%S%z").json
 
   echo "Recovering with $FILE"
   
   solana-keygen recover -o $FILE
 
-  solana program deploy \
-    -k ./.secrets/payer.json \
+  cli program deploy \
     --buffer $FILE \
-    --upgrade-authority ./.secrets/payer.json \
+    --upgrade-authority $KEY \
     --program-id ./target/deploy/solana_options-keypair.json \
     ./target/deploy/solana_options.so
 }
 
-function extend {
-  solana program extend $PROGRAM_ID 20000 -k ./.secrets/payer.json
-}
 
-function sync {
-  cp ./target/idl/solana_options.json ../solana-frontend/src/target/idl/solana_options.json
-  cp ./target/types/solana_options.ts ../solana-frontend/src/target/types/solana_options.ts
-}
-
-# function close() {
-#   echo "Closing"
-#   solana program close -k ./keypair.json "32wHkik88Ng8emN7NX6gBTJ8r74r55jc23iSm5tieYxi" --bypass-warning
-# }
 ${@}

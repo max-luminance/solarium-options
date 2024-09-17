@@ -1,8 +1,7 @@
 {
   "license": "ISC",
   "scripts": {
-    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "format": "prettier -w .",
     "test": "RUST_LOG= vitest run"
   },
   "dependencies": {
@@ -18,7 +17,7 @@
   "devDependencies": {
     "@types/bn.js": "5.1.0",
     "@types/node": "^22.5.0",
-    "prettier": "2.6.2",
+    "prettier": "3.3.3",
     "typescript": "5.5.4"
   }
 }

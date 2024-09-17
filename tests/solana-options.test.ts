@@ -185,6 +185,7 @@ const fixtureBought = async () => {
       data: pda,
       buyer: buyer.publicKey,
       mintPremium: wsol,
+      payer: buyer.publicKey,
     })
     .signers([buyer])
     .rpc();
@@ -382,6 +383,7 @@ describe("solana-options", () => {
           data: pda,
           buyer: buyer.publicKey,
           mintPremium: wsol,
+          payer: buyer.publicKey,
         })
         .signers([buyer])
         .rpc();
@@ -410,7 +412,7 @@ describe("solana-options", () => {
       );
     });
 
-    it.only("Can allow 3rd party to successfully buy for buyer", async () => {
+    it("Can allow 3rd party to successfully buy for buyer", async () => {
       const { program, pda, buyer, wsol, context, expiry, usdc, seller } =
         await fixtureInitialized();
 
@@ -462,6 +464,7 @@ describe("solana-options", () => {
           data: pda,
           buyer: buyer.publicKey,
           mintPremium: wsol,
+          payer: buyer.publicKey,
         })
         .signers([buyer])
         .rpc();
@@ -473,9 +476,10 @@ describe("solana-options", () => {
         program.methods
           .buy(new anchor.BN(10))
           .accounts({
-            data: pda,
             buyer: buyer.publicKey,
+            data: pda,
             mintPremium: wsol,
+            payer: buyer.publicKey,
           })
           .signers([buyer])
           .rpc()
@@ -495,6 +499,7 @@ describe("solana-options", () => {
         program.methods
           .buy(new anchor.BN(10))
           .accounts({
+            payer: buyer.publicKey,
             data: pda,
             buyer: buyer.publicKey,
             mintPremium: wsol,
@@ -520,6 +525,7 @@ describe("solana-options", () => {
         program.methods
           .buy(new anchor.BN(500))
           .accounts({
+            payer: buyer.publicKey,
             data: pda,
             buyer: buyer.publicKey,
             mintPremium: usdc,
@@ -537,6 +543,7 @@ describe("solana-options", () => {
         program.methods
           .buy(new anchor.BN(500))
           .accounts({
+            payer: buyer.publicKey,
             data: pda,
             buyer: buyer.publicKey,
             mintPremium: usdc,
@@ -558,6 +565,7 @@ describe("solana-options", () => {
         program.methods
           .buy(new anchor.BN(2000))
           .accounts({
+            payer: buyer.publicKey,
             data: pda,
             buyer: buyer.publicKey,
             mintPremium: wsol,
@@ -576,6 +584,7 @@ describe("solana-options", () => {
         program.methods
           .buy(new anchor.BN(1))
           .accounts({
+            payer: seller.publicKey,
             data: pda,
             buyer: seller.publicKey,
             mintPremium: wsol,

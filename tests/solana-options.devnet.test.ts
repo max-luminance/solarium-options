@@ -2,7 +2,6 @@ import fs from "fs";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
   Program,
-  Idl,
   AnchorProvider,
   setProvider,
   Wallet,
@@ -25,7 +24,6 @@ import {
   Connection,
   PublicKey,
   SystemProgram,
-  Signer,
   Transaction,
   Keypair,
 } from "@solana/web3.js";
@@ -54,7 +52,7 @@ const faddr = (addr: PublicKey) =>
 
 const loadWallet = (file: string) =>
   web3.Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(file, "utf-8")))
+    Buffer.from(JSON.parse(fs.readFileSync(file, "utf-8"))),
   );
 
 const payer = loadWallet("./.secrets/payer.json");
@@ -100,22 +98,22 @@ describe.skip(
     const expiry = new BN(Math.floor(Date.now() / 1000) + 60);
 
     const usdcKeypair = Keypair.fromSecretKey(
-      Buffer.from(JSON.parse(fs.readFileSync("./.secrets/usdc.json", "utf-8")))
+      Buffer.from(JSON.parse(fs.readFileSync("./.secrets/usdc.json", "utf-8"))),
     );
     const usdc = usdcKeypair.publicKey;
 
     const ataBuyerSol = getAssociatedTokenAddressSync(
       NATIVE_MINT,
-      buyer.publicKey
+      buyer.publicKey,
     );
     const ataSellerSol = getAssociatedTokenAddressSync(
       NATIVE_MINT,
-      seller.publicKey
+      seller.publicKey,
     );
     const ataBuyerQuote = getAssociatedTokenAddressSync(usdc, buyer.publicKey);
     const ataSellerQuote = getAssociatedTokenAddressSync(
       usdc,
-      seller.publicKey
+      seller.publicKey,
     );
     const pda = getPda({
       amountQuote: amountQuote,
@@ -141,23 +139,23 @@ describe.skip(
       console.log("Vault PDA    :", pda.toString());
       console.log(
         "Vault WSOL   :",
-        getAssociatedTokenAddressSync(NATIVE_MINT, pda, true).toString()
+        getAssociatedTokenAddressSync(NATIVE_MINT, pda, true).toString(),
       );
       console.log(
         "Vault USDC   :",
-        getAssociatedTokenAddressSync(usdc, pda, true).toString()
+        getAssociatedTokenAddressSync(usdc, pda, true).toString(),
       );
       const [solPayer, solSeller, solBuyer] = await Promise.all(
         [payer, seller, buyer].map((a) =>
-          connection.getBalance(a.publicKey).then((x) => BigInt(x))
-        )
+          connection.getBalance(a.publicKey).then((x) => BigInt(x)),
+        ),
       );
 
       // Fund all accounts with necessary SOL
       if (solPayer < parseUnits("1", 9)) {
         const sig = await connection.requestAirdrop(
           payer.publicKey,
-          Number(parseUnits("5", 9))
+          Number(parseUnits("5", 9)),
         );
         log("Requested airdrop to payer", sig);
       }
@@ -168,7 +166,7 @@ describe.skip(
             fromPubkey: payer.publicKey,
             toPubkey: seller.publicKey,
             lamports: amountBase + gas - solSeller,
-          })
+          }),
         );
         tx.feePayer = payer.publicKey;
         await connection
@@ -182,7 +180,7 @@ describe.skip(
             fromPubkey: payer.publicKey,
             toPubkey: buyer.publicKey,
             lamports: amountQuote + gas - solBuyer,
-          })
+          }),
         );
         tx.feePayer = payer.publicKey;
         await connection
@@ -198,7 +196,7 @@ describe.skip(
           payer.publicKey,
           null,
           6,
-          usdcKeypair
+          usdcKeypair,
         ).then(() => {
           console.log("Created USDC Mint", usdc.toString());
         });
@@ -209,7 +207,7 @@ describe.skip(
           connection,
           payer,
           usdc,
-          seller.publicKey
+          seller.publicKey,
         ).then(() => console.log("Created Seller USDC ata"));
       }
 
@@ -219,7 +217,7 @@ describe.skip(
           connection,
           payer,
           usdc,
-          buyer.publicKey
+          buyer.publicKey,
         ).then(() => console.log("Created Buyer USDC ata"));
         await mintTo(
           connection,
@@ -227,7 +225,7 @@ describe.skip(
           usdc,
           ataBuyerQuote,
           payer,
-          amountQuote
+          amountQuote,
         ).then(() => console.log("Minted USDC to Buyer"));
       }
 
@@ -239,7 +237,7 @@ describe.skip(
           usdc,
           ataBuyerQuote,
           payer,
-          amountQuote - info.amount
+          amountQuote - info.amount,
         ).then(() => console.log("Minted USDC to Buyer"));
       }
     }, 100_000);
@@ -249,14 +247,14 @@ describe.skip(
         .initialize(
           new BN(amountBase.toString()),
           new BN(amountQuote.toString()),
-          expiry
+          expiry,
         )
         .preInstructions([
           createAssociatedTokenAccountInstruction(
             seller.publicKey,
             ataSellerSol,
             seller.publicKey,
-            NATIVE_MINT
+            NATIVE_MINT,
           ),
           SystemProgram.transfer({
             fromPubkey: seller.publicKey,
@@ -275,7 +273,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataSellerSol,
             seller.publicKey,
-            seller.publicKey
+            seller.publicKey,
           ),
         ])
         .signers([seller])
@@ -306,7 +304,7 @@ describe.skip(
             buyer.publicKey,
             ataBuyerSol,
             buyer.publicKey,
-            NATIVE_MINT
+            NATIVE_MINT,
           ),
           SystemProgram.transfer({
             fromPubkey: buyer.publicKey,
@@ -324,7 +322,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataBuyerSol,
             buyer.publicKey,
-            buyer.publicKey
+            buyer.publicKey,
           ),
         ])
         .signers([buyer])
@@ -356,7 +354,7 @@ describe.skip(
             buyer.publicKey,
             ataBuyerSol,
             buyer.publicKey,
-            NATIVE_MINT
+            NATIVE_MINT,
           ),
         ])
         .accounts({
@@ -369,7 +367,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataBuyerSol,
             buyer.publicKey,
-            buyer.publicKey
+            buyer.publicKey,
           ),
         ])
         .signers([buyer])
@@ -400,7 +398,7 @@ describe.skip(
             seller.publicKey,
             ataSellerSol,
             seller.publicKey,
-            NATIVE_MINT
+            NATIVE_MINT,
           ),
         ])
         .accounts({
@@ -415,7 +413,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataSellerSol,
             seller.publicKey,
-            seller.publicKey
+            seller.publicKey,
           ),
         ])
         .signers([seller])
@@ -435,13 +433,13 @@ describe.skip(
           ataSellerQuote,
           ataBuyerQuote,
           seller.publicKey,
-          amountQuote
-        )
+          amountQuote,
+        ),
       );
 
       tx2.feePayer = payer.publicKey;
       const sig = await connection.sendTransaction(tx2, [buyer, seller, payer]);
       log("Rebalanced funds", sig);
     });
-  }
+  },
 );

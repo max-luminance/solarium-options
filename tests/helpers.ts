@@ -34,7 +34,7 @@ export function getPda(seeds: {
       new BN(seeds.amountQuote.toString()).toArrayLike(Buffer, "le", 8),
       new BN(seeds.expiry.toString()).toArrayLike(Buffer, "le", 8),
     ],
-    seeds.programId
+    seeds.programId,
   );
   return pda;
 }
