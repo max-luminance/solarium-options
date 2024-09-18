@@ -15,3 +15,12 @@ pub struct CoveredCall {
     pub is_exercised: bool,
     pub timestamp_created: i64,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct ExpiryData {
+    pub price: i64,
+    pub conf: u64,
+    pub exponent: i32,
+    pub publish_time: i64,
+}

@@ -9,7 +9,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("3JZ99S1BGfcdExZ4immxWKSGAFkbe3hxZo9NRxvrair4");
+declare_id!("So1ar1uyyJ2bhm4DTN3M2wWkug4trVknn2kdZ2vD2Vh");
 
 #[program]
 pub mod solana_options {
@@ -34,5 +34,9 @@ pub mod solana_options {
         timestamp_expiry: i64,
     ) -> Result<()> {
         handle_initialize(ctx, amount_base, amount_quote, timestamp_expiry)
+    }
+
+    pub fn mark(ctx: Context<Mark>, timestamp_expiry: i64) -> Result<()> {
+        handle_mark(ctx, timestamp_expiry)
     }
 }

@@ -38,3 +38,18 @@ export function getPda(seeds: {
   );
   return pda;
 }
+
+export function getExpiryPda(seeds: { expiry: Date; programId: PublicKey }) {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("expiry-meta"),
+      new BN(Math.floor(seeds.expiry.getTime() / 1000).toString()).toArrayLike(
+        Buffer,
+        "le",
+        8,
+      ),
+    ],
+    seeds.programId,
+  );
+  return pda;
+}

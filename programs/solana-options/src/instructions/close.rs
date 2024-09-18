@@ -25,9 +25,9 @@ pub struct Close<'info> {
             buyer.key().as_ref(),
             mint_base.key().as_ref(),
             mint_quote.key().as_ref(),
-            &data.amount_base.to_le_bytes(), 
-            &data.amount_quote.to_le_bytes(), 
-            &data.timestamp_expiry.to_le_bytes(), 
+            &data.amount_base.to_le_bytes(),
+            &data.amount_quote.to_le_bytes(),
+            &data.timestamp_expiry.to_le_bytes(),
         ],
         bump = data.bump,
         close = seller,
@@ -71,14 +71,14 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
     let clock = Clock::get()?;
 
     let seeds = [
-        "covered-call".as_bytes(), 
+        "covered-call".as_bytes(),
         ctx.accounts.data.seller.as_ref(),
         ctx.accounts.data.buyer.as_ref(),
         ctx.accounts.data.mint_base.as_ref(),
         ctx.accounts.data.mint_quote.as_ref(),
-        &ctx.accounts.data.amount_base.to_le_bytes(), 
-        &ctx.accounts.data.amount_quote.to_le_bytes(), 
-        &ctx.accounts.data.timestamp_expiry.to_le_bytes(), 
+        &ctx.accounts.data.amount_base.to_le_bytes(),
+        &ctx.accounts.data.amount_quote.to_le_bytes(),
+        &ctx.accounts.data.timestamp_expiry.to_le_bytes(),
         &[ctx.accounts.data.bump],
     ];
     let signer = &[&seeds[..]];
