@@ -20,9 +20,13 @@ import {
   getAccount,
 } from "spl-token-bankrun";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, Signer } from "@solana/web3.js";
-import { getExpiryPda, getPda } from "./helpers.js";
+import { getExpiryPda, getPda, getStrikePrice } from "./helpers.js";
+import { getI32Codec, getI64Codec, getU64Codec } from "@solana/codecs-numbers";
 
 const authority = anchor.web3.Keypair.generate();
+const priceUpdate = new PublicKey(
+  "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+);
 async function getAtaTokenBalance(
   client: BanksClient,
   mint: PublicKey,
@@ -130,6 +134,30 @@ const fixtureDeployed = async () => {
     fundAtaAccount(context.banksClient, wsol, buyer, BigInt(1000)),
   ]);
 
+  const setPrice = (price: number, time = new Date()) => {
+    const buff = Buffer.concat([
+      Buffer.from([0x22, 0xf1, 0x23, 0x63, 0x9d, 0x7e, 0xf4, 0xcd]), // Discriminator
+      new PublicKey("7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE").toBuffer(), // Write Authority
+      Buffer.from([0x01]), // Verification Level
+      Buffer.from("7w2Lb9os66QdoV1AldHaOSoNL47Qxse8D0z6yMKAtW0", "base64"), // Price Message - Fee ID
+      getI64Codec().encode(price * 10 ** 8), // Price Message - Price
+      getU64Codec().encode(12190053), // Price Message - Conf
+      getI32Codec().encode(-8), // Price Message - Exponent
+      getI64Codec().encode(Math.floor(time.getTime() / 1000)), // Price Message - PublishTime
+      getI64Codec().encode(Math.floor(time.getTime() / 1000)), // Price Message - Prev Publish Time
+      getI64Codec().encode(13867629500n), // Price Message - Ema Price
+      getU64Codec().encode(10350801n), // Price Message - Ema Conf
+      getU64Codec().encode(327071567n), // Posted Slot
+    ]);
+
+    context.setAccount(priceUpdate, {
+      data: buff,
+      owner: new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
+      executable: false,
+      lamports: 201823520,
+    });
+  };
+
   return {
     context,
     program,
@@ -139,13 +167,14 @@ const fixtureDeployed = async () => {
     usdc,
     buyer,
     payer,
+    setPrice,
   };
 };
 
 const fixtureInitialized = async () => {
   const fixture = await fixtureDeployed();
   const { context, program, wsol, usdc, buyer, seller } = fixture;
-  const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
+  const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 180);
   await program.methods
     .initialize(
       new anchor.BN("1000"),
@@ -197,7 +226,12 @@ const fixtureBought = async () => {
 
 const fixtureExercised = async () => {
   const fixture = await fixtureBought();
-  const { program, pda, buyer, wsol, context, usdc } = fixture;
+  const { program, pda, buyer, wsol, context, usdc, setPrice, expiry } =
+    fixture;
+
+  setPrice(4000);
+  await program.methods.mark(expiry).accounts({ priceUpdate }).rpc();
+  await warpTo(context, expiry.add(new anchor.BN(10)));
 
   // Create and fund the ata account for the buyer
   await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
@@ -401,7 +435,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         mintBase: wsol,
         mintQuote: usdc,
         seller: seller.publicKey,
-        timestampCreated: expect.toBeBN(new BN(Date.now() / 1000)),
+        timestampCreated: expect.any(BN),
         timestampExpiry: expect.toBeBN(expiry),
       });
 
@@ -600,26 +634,45 @@ describe("solana-options", { timeout: 100_000 }, () => {
   });
 
   describe("Exercise instruction", () => {
-    it("Can successfully exercise", async () => {
+    it("Can reject if option has not been marked", async () => {
       const { program, pda, buyer, wsol, context, usdc } =
         await fixtureBought();
-      // Create and fund the ata account for the buyer
-      await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
+
+      await expect(
+        program.methods
+          .exercise()
+          .accounts({
+            mintBase: wsol,
+            mintQuote: usdc,
+            data: pda,
+            buyer: buyer.publicKey,
+          })
+          .signers([buyer])
+          .rpc(),
+      ).rejects.toThrowError(
+        "AnchorError caused by account: expiry. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
+      );
+    });
+
+    const fixtureMarked = async () => {
+      const fixture = await fixtureBought();
+      const { program, setPrice, expiry } = fixture;
+      setPrice(4000);
+      await program.methods.mark(expiry).accounts({ priceUpdate }).rpc();
+      return fixture;
+    };
+
+    it("Can exercise", async () => {
+      const { program, pda, buyer, wsol, context, usdc, setPrice, expiry } =
+        await fixtureMarked();
 
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
       ).to.equal(BigInt(990));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, buyer.publicKey),
-      ).to.equal(BigInt(3500));
 
-      expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1010),
-      );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(0),
-      );
+      expect(getStrikePrice(1000n, 3500n)).to.equal(3500);
 
+      await warpTo(context, expiry.add(new anchor.BN(100)));
       await program.methods
         .exercise()
         .accounts({
@@ -631,31 +684,19 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .signers([buyer])
         .rpc();
 
-      const state = await program.account.coveredCall.fetch(pda);
-      expect(state.isExercised).toEqual(true);
-
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
-      ).to.equal(BigInt(1990));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, buyer.publicKey),
-      ).to.equal(BigInt(0));
-
+      ).to.equal(BigInt(990 + 125));
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(10),
-      );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(3500),
+        BigInt(1000 - 125 + 10),
       );
     });
 
     it("Can reject if option has already been exercised", async () => {
-      const { program, pda, buyer, wsol, context, usdc } =
-        await fixtureBought();
+      const { program, pda, buyer, wsol, context, usdc, expiry } =
+        await fixtureMarked();
 
-      // Create and fund the ata account for the buyer
-      await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(7000));
-
+      await warpTo(context, expiry.add(new anchor.BN(100)));
       await program.methods
         .exercise()
         .accounts({
@@ -687,10 +728,14 @@ describe("solana-options", { timeout: 100_000 }, () => {
     });
 
     it("Can reject if option hasn't been bought", async () => {
-      const { program, pda, buyer, wsol, context, usdc } =
+      const { program, pda, buyer, wsol, context, usdc, setPrice, expiry } =
         await fixtureInitialized();
 
-      await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
+      setPrice(4000);
+      await program.methods.mark(expiry).accounts({ priceUpdate }).rpc();
+
+      await warpTo(context, expiry.add(new anchor.BN(100)));
+
       await expect(
         program.methods
           .exercise()
@@ -707,65 +752,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
       );
     });
 
-    it("Can reject if buyer doesn't have ata account for quote", async () => {
-      const { program, pda, buyer, wsol, context, usdc } =
-        await fixtureInitialized();
-      await expect(
-        program.methods
-          .exercise()
-          .accounts({
-            mintBase: wsol,
-            mintQuote: usdc,
-            data: pda,
-            buyer: buyer.publicKey,
-          })
-          .signers([buyer])
-          .rpc(),
-      ).rejects.toThrowError(
-        "AnchorError caused by account: ata_buyer_quote. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
-      );
-    });
-
-    it("Can reject if buyer has insufficient funds", async () => {
-      const { program, pda, buyer, wsol, context, usdc } =
-        await fixtureInitialized();
-      await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(300));
-      await expect(
-        program.methods
-          .exercise()
-          .accounts({
-            mintBase: wsol,
-            mintQuote: usdc,
-            data: pda,
-            buyer: buyer.publicKey,
-          })
-          .signers([buyer])
-          .rpc(),
-      ).rejects.toThrowError(
-        "AnchorError caused by account: ata_buyer_quote. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
-      );
-    });
-
     it("Can reject if not buyer", async () => {
       const { program, pda, seller, wsol, usdc, context } =
-        await fixtureInitialized();
+        await fixtureMarked();
 
-      await expect(
-        program.methods
-          .exercise()
-          .accounts({
-            mintBase: wsol,
-            mintQuote: usdc,
-            data: pda,
-            buyer: seller.publicKey,
-          })
-          .signers([seller])
-          .rpc(),
-      ).rejects.toThrowError(
-        "AnchorError caused by account: ata_buyer_quote. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
-      );
-      // Create and fund the ata account for the buyer
-      await fundAtaAccount(context.banksClient, usdc, seller, BigInt(1));
       await expect(
         program.methods
           .exercise()
@@ -782,12 +772,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
       );
     });
 
-    it("Can reject if option is expired", async () => {
+    it("Can reject if option as not expired", async () => {
       const { program, pda, buyer, wsol, context, usdc, expiry } =
-        await fixtureInitialized();
-
-      await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(3500));
-      await warpTo(context, expiry.add(new anchor.BN(100)));
+        await fixtureMarked();
 
       await expect(
         program.methods
@@ -801,7 +788,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
           .signers([buyer])
           .rpc(),
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionExpired. Error Number: 6001. Error Message: Option has expired./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionNotExpired. Error Number: 6006. Error Message: Option has not expired./,
       );
     });
   });
@@ -812,25 +799,16 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureExercised();
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(10),
-      );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(3500),
+        BigInt(885),
       );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
       ).to.equal(BigInt(0));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
-      ).to.equal(BigInt(0));
-
-      await fundAtaAccount(context.banksClient, usdc, seller, 0);
 
       await program.methods
         .close()
         .accounts({
           mintBase: wsol,
-          mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
           buyer: buyer.publicKey,
@@ -854,15 +832,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
         BigInt(0),
       );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(0),
-      );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
-      ).to.equal(BigInt(10));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
-      ).to.equal(BigInt(3500));
+      ).to.equal(BigInt(885));
     });
 
     it("Can successfully close exercised option by anyone", async () => {
@@ -873,16 +845,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
       await airdrop(context, keeper.publicKey, 1 * LAMPORTS_PER_SOL);
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(10),
-      );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(3500),
+        BigInt(885),
       );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
-      ).to.equal(BigInt(0));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
       ).to.equal(BigInt(0));
 
       await fundAtaAccount(context.banksClient, usdc, seller, 0);
@@ -903,15 +869,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
         BigInt(0),
       );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(0),
-      );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
-      ).to.equal(BigInt(10));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
-      ).to.equal(BigInt(3500));
+      ).to.equal(BigInt(885));
     });
 
     it("Can successfully close unbought option by anyone", async () => {
@@ -924,23 +884,14 @@ describe("solana-options", { timeout: 100_000 }, () => {
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
         BigInt(1000),
       );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(0),
-      );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
       ).to.equal(BigInt(0));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
-      ).to.equal(BigInt(0));
-
-      await fundAtaAccount(context.banksClient, usdc, seller, 0);
 
       await program.methods
         .close()
         .accounts({
           mintBase: wsol,
-          mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
           payer: keeper.publicKey,
@@ -952,42 +903,28 @@ describe("solana-options", { timeout: 100_000 }, () => {
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
         BigInt(0),
       );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(0),
-      );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
       ).to.equal(BigInt(1000));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
-      ).to.equal(BigInt(0));
     });
 
     it("Can successfully close unexercised option after expiry", async () => {
       const { program, pda, wsol, context, usdc, seller, expiry, buyer } =
         await fixtureBought();
 
-      await fundAtaAccount(context.banksClient, usdc, seller, 0);
       await warpTo(context, expiry.add(new anchor.BN(100)));
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
         BigInt(1010),
       );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
-        BigInt(0),
-      );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
-      ).to.equal(BigInt(0));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
       ).to.equal(BigInt(0));
 
       await program.methods
         .close()
         .accounts({
           mintBase: wsol,
-          mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
           payer: seller.publicKey,
@@ -1003,31 +940,27 @@ describe("solana-options", { timeout: 100_000 }, () => {
           token.getAssociatedTokenAddressSync(wsol, pda, true),
         ),
       ).to.equal(null);
-      expect(
-        await context.banksClient.getAccount(
-          token.getAssociatedTokenAddressSync(usdc, pda, true),
-        ),
-      ).to.equal(null);
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(0),
-      );
-      expect(await getAtaTokenBalance(context.banksClient, usdc, pda)).to.equal(
         BigInt(0),
       );
       expect(
         await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
       ).to.equal(BigInt(1010));
-      expect(
-        await getAtaTokenBalance(context.banksClient, usdc, seller.publicKey),
-      ).to.equal(BigInt(0));
     });
 
     it("Can reject closing bought option before expiry", async () => {
-      const { program, pda, wsol, context, usdc, seller, buyer } =
-        await fixtureBought();
-
-      await fundAtaAccount(context.banksClient, usdc, seller, 0);
+      const {
+        program,
+        pda,
+        wsol,
+        context,
+        usdc,
+        seller,
+        buyer,
+        expiry,
+        setPrice,
+      } = await fixtureBought();
 
       await expect(
         program.methods
@@ -1048,26 +981,47 @@ describe("solana-options", { timeout: 100_000 }, () => {
     });
   });
 
+  it("has correct price update account", async () => {
+    const { provider } = await fixtureDeployed();
+
+    const SOL_PRICE_FEED_ID =
+      "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
+
+    const pyth = new PythSolanaReceiver(provider);
+    expect(pyth.getPriceFeedAccountAddress(0, SOL_PRICE_FEED_ID)).to.deep.equal(
+      priceUpdate,
+    );
+  });
+
   describe("Can set mark price", () => {
-    it("Can set mark price", async () => {
-      const { program, context, provider } = await fixtureDeployed();
-      const SOL_PRICE_FEED_ID =
-        "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
-
-      const pyth = new PythSolanaReceiver(provider);
-      const priceUpdate = pyth.getPriceFeedAccountAddress(0, SOL_PRICE_FEED_ID);
-
-      context.setAccount(priceUpdate, {
-        data: Buffer.from(
-          "IvEjY51+9M1gMUcENA3t3zcf1CRyFI8kjp0abRpesqw6zYt/1dayQwHvDYtv2izrpB2hXUCV0do5Kg0vjtDGx7wPTPrIwoC1bRAragIDAAAA8IahAAAAAAD4////krbqZgAAAACStupmAAAAADh6IwQDAAAAbiyNAAAAAADMfnsTAAAAAAA=",
-          "base64",
-        ),
-        owner: new PublicKey("rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ"),
-        executable: false,
-        lamports: 201823520,
-      });
+    it("Can reject if mark price is no close enough to expiry", async () => {
+      const { program, context, provider, setPrice } = await fixtureDeployed();
 
       const expiry = new Date();
+      const publishTime = new Date(expiry.getTime() - 30 * 60 * 1000 - 1);
+      setPrice(130, publishTime);
+
+      await expect(
+        program.methods
+          .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+          .accounts({ priceUpdate })
+          .rpc(),
+      ).rejects.toThrowError(
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./,
+      );
+    });
+
+    it("Can set mark price after expiry", async () => {
+      const { program, context, provider, setPrice } = await fixtureDeployed();
+
+      const expiry = new Date();
+      const publishTime = expiry;
+      setPrice(130, publishTime);
+
+      await warpTo(
+        context,
+        new BN(expiry.getTime() / 1000).add(new anchor.BN(10_000)),
+      );
 
       await program.methods
         .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
@@ -1079,9 +1033,117 @@ describe("solana-options", { timeout: 100_000 }, () => {
           getExpiryPda({ expiry, programId: program.programId }),
         ),
       ).toStrictEqual({
-        conf: expect.toBeBN(new BN(10585840)),
-        price: expect.toBeBN(new BN(12925414160)),
-        publishTime: expect.toBeBN(new BN(1726658194)),
+        bump: expect.any(Number),
+        conf: expect.toBeBN(new BN(12190053)),
+        price: expect.toBeBN(new BN(13000000000)),
+        publishTime: expect.toBeBN(
+          new BN(Math.floor(publishTime.getTime() / 1000)),
+        ),
+        exponent: -8,
+      });
+    });
+
+    it("Can set mark price", async () => {
+      const { program, context, provider, setPrice } = await fixtureDeployed();
+
+      const publishTime = new Date(Date.now() - 1000);
+      const expiry = new Date();
+      setPrice(130, publishTime);
+
+      await program.methods
+        .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+        .accounts({ priceUpdate })
+        .rpc();
+
+      expect(
+        await program.account.expiryData.fetch(
+          getExpiryPda({ expiry, programId: program.programId }),
+        ),
+      ).toStrictEqual({
+        bump: expect.any(Number),
+        conf: expect.toBeBN(new BN(12190053)),
+        price: expect.toBeBN(new BN(13000000000)),
+        publishTime: expect.toBeBN(
+          new BN(Math.floor(publishTime.getTime() / 1000)),
+        ),
+        exponent: -8,
+      });
+    });
+
+    it("Can reject if price is after expiry", async () => {
+      const { program, context, provider, setPrice } = await fixtureDeployed();
+
+      const expiry = new Date();
+      const publishTime = new Date(expiry.getTime() + 1000);
+      setPrice(130, publishTime);
+
+      await expect(
+        program.methods
+          .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+          .accounts({ priceUpdate })
+          .rpc(),
+      ).rejects.toThrowError(
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./,
+      );
+    });
+
+    it("Can reject update if mark price is further away", async () => {
+      const { program, context, provider, setPrice } = await fixtureDeployed();
+
+      const expiry = new Date();
+
+      setPrice(130, new Date(expiry.getTime() - 1000));
+      await program.methods
+        .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+        .accounts({ priceUpdate })
+        .rpc();
+
+      const publishTime = new Date(expiry.getTime() - 2000);
+      setPrice(131, publishTime);
+
+      await new Promise((resolve) => setTimeout(resolve, 3));
+
+      await expect(
+        program.methods
+          .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+          .accounts({ priceUpdate })
+          .rpc(),
+      ).rejects.toThrowError(
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./,
+      );
+    });
+
+    it("Can update if mark price is closer", async () => {
+      const { program, setPrice } = await fixtureDeployed();
+
+      const expiry = new Date();
+
+      setPrice(130, new Date(expiry.getTime() - 2000));
+      await program.methods
+        .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+        .accounts({ priceUpdate })
+        .rpc();
+
+      await new Promise((resolve) => setTimeout(resolve, 3));
+
+      const publishTime = new Date(expiry.getTime() - 1000);
+      setPrice(131, publishTime);
+      await program.methods
+        .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+        .accounts({ priceUpdate })
+        .rpc();
+
+      expect(
+        await program.account.expiryData.fetch(
+          getExpiryPda({ expiry, programId: program.programId }),
+        ),
+      ).toStrictEqual({
+        bump: expect.any(Number),
+        conf: expect.toBeBN(new BN(12190053)),
+        price: expect.toBeBN(new BN(13100000000)),
+        publishTime: expect.toBeBN(
+          new BN(Math.floor(publishTime.getTime() / 1000)),
+        ),
         exponent: -8,
       });
     });

@@ -14,4 +14,10 @@ pub enum ErrorCode {
     OptionCannotBeClosedYet,
     #[msg("Option already exercised")]
     OptionAlreadyExercised,
+    #[msg("Option has not expired")]
+    OptionNotExpired,
+    #[msg("Price not close to expiry")]
+    PriceIrrelevant,
+    #[msg("Option not marked")]
+    OptionNotMarked,
 }

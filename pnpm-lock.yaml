@@ -11,6 +11,9 @@ dependencies:
   "@pythnetwork/pyth-solana-receiver":
     specifier: ^0.8.2
     version: 0.8.2
+  "@solana/codecs-numbers":
+    specifier: 2.0.0-experimental.5e8ac8d
+    version: 2.0.0-experimental.5e8ac8d
   "@solana/spl-token":
     specifier: 0.4.6
     version: 0.4.6(@solana/web3.js@1.91.9)(fastestsmallesttextencoderdecoder@1.0.22)
@@ -858,6 +861,13 @@ packages:
       buffer: 6.0.3
     dev: false
 
+  /@solana/codecs-core@2.0.0-experimental.5e8ac8d:
+    resolution:
+      {
+        integrity: sha512-GrzBK2u957RsL42oh/04jMVpOj6hAnPpeF4gZT3/dL4zaYRnr6kDgW7bckiJm23ewzxUecIIbdb8/UPG6Nh18g==,
+      }
+    dev: false
+
   /@solana/codecs-core@2.0.0-preview.2:
     resolution:
       {
@@ -876,6 +886,15 @@ packages:
       "@solana/codecs-core": 2.0.0-preview.2
       "@solana/codecs-numbers": 2.0.0-preview.2
       "@solana/errors": 2.0.0-preview.2
+    dev: false
+
+  /@solana/codecs-numbers@2.0.0-experimental.5e8ac8d:
+    resolution:
+      {
+        integrity: sha512-48xUa3JxmkAhBSwN/fbwbAvusPkPqeGUrYt0lECB6OMHqIYmjevEUJgscP0Aq7rsjtGOPzxIgjsqrtlWs775/Q==,
+      }
+    dependencies:
+      "@solana/codecs-core": 2.0.0-experimental.5e8ac8d
     dev: false
 
   /@solana/codecs-numbers@2.0.0-preview.2:

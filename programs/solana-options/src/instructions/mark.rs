@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::error::ErrorCode;
 use crate::ExpiryData;
 use pyth_solana_receiver_sdk::price_update::{get_feed_id_from_hex, PriceUpdateV2};
 
@@ -26,15 +27,36 @@ pub struct Mark<'info> {
 
 pub fn handle_mark(ctx: Context<Mark>, expiry: i64) -> Result<()> {
     let price_update = &mut ctx.accounts.price_update;
-    let maximum_age: u64 = 604800;
+
+    let window: i64 = 30 * 60; // Allow prices in this time before expiry
+    let clock = Clock::get()?;
+
+    let maximum_age: u64 = (clock.unix_timestamp - (expiry - window))
+        .try_into()
+        .unwrap_or_else(|_| window.try_into().unwrap());
+
     let feed_id: [u8; 32] =
         get_feed_id_from_hex("0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d")?;
-    let price = price_update.get_price_no_older_than(&Clock::get()?, maximum_age, &feed_id)?;
+
+    let price = price_update.get_price_no_older_than(&clock, maximum_age, &feed_id)?;
+
+    require!(
+        (expiry - window) < price.publish_time && price.publish_time <= expiry,
+        ErrorCode::PriceIrrelevant,
+    );
+
+    // Ensure updated price is more recent
+    require!(
+        price.publish_time > ctx.accounts.expiry.publish_time,
+        ErrorCode::PriceIrrelevant
+    );
+
     ctx.accounts.expiry.set_inner(ExpiryData {
         price: price.price,
         conf: price.conf,
         exponent: price.exponent,
         publish_time: price.publish_time,
+        bump: ctx.bumps.expiry,
     });
     Ok(())
 }

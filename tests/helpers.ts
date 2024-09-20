@@ -12,6 +12,12 @@ expect.extend({
     };
   },
 });
+export function getStrikePrice(
+  amountBase: bigint,
+  amountQuote: bigint,
+): number {
+  return Math.round(Number((amountQuote * 10n ** 3n) / amountBase));
+}
 
 export function getPda(seeds: {
   amountBase: bigint;
