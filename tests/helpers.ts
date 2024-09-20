@@ -19,6 +19,10 @@ export function getStrikePrice(
   return Math.round(Number((amountQuote * 10n ** 3n) / amountBase));
 }
 
+export function getQuoteAmountWithStrike(amountBase: bigint, strike: number) {
+  return BigInt(Math.round((Number(amountBase) * strike) / 10 ** 3));
+}
+
 export function getPda(seeds: {
   amountBase: bigint;
   amountQuote: bigint;

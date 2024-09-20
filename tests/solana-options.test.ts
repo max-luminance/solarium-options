@@ -609,7 +609,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
           .signers([buyer])
           .rpc(),
       ).rejects.toThrowError(
-        "AnchorError caused by account: ata_buyer_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
+        "AnchorError caused by account: ata_payer_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
       );
     });
 

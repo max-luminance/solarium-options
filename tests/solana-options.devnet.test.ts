@@ -1,3 +1,4 @@
+import axios from "axios";
 import fs from "fs";
 import { describe, it, expect, beforeAll } from "vitest";
 import {
@@ -9,15 +10,10 @@ import {
   web3,
 } from "@coral-xyz/anchor";
 import {
-  createAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction,
   createCloseAccountInstruction,
-  createMint,
   createSyncNativeInstruction,
-  createTransferInstruction,
-  getAccount,
   getAssociatedTokenAddressSync,
-  mintTo,
   NATIVE_MINT,
 } from "@solana/spl-token";
 import {
@@ -26,12 +22,15 @@ import {
   SystemProgram,
   Transaction,
   Keypair,
+  VersionedTransaction,
+  TransactionMessage,
 } from "@solana/web3.js";
 
 import { SolanaOptions } from "../target/types/solana_options";
 import IDL from "../target/idl/solana_options.json";
-import { getPda } from "./helpers";
+import { getPda, getQuoteAmountWithStrike } from "./helpers";
 import { parseUnits } from "./viem";
+import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 
 const RPC = "https://api.devnet.solana.com";
 const connection = new Connection(RPC, {
@@ -52,7 +51,7 @@ const faddr = (addr: PublicKey) =>
 
 const loadWallet = (file: string) =>
   web3.Keypair.fromSecretKey(
-    Buffer.from(JSON.parse(fs.readFileSync(file, "utf-8"))),
+    Buffer.from(JSON.parse(fs.readFileSync(file, "utf-8")))
   );
 
 const payer = loadWallet("./.secrets/payer.json");
@@ -64,7 +63,7 @@ setProvider(provider);
 
 const program = new Program<SolanaOptions>(IDL as SolanaOptions, provider);
 
-const programId = new PublicKey("3JZ99S1BGfcdExZ4immxWKSGAFkbe3hxZo9NRxvrair4");
+const programId = new PublicKey(IDL.address);
 
 // async function getProgramAccounts(program: Program<SolanaOptions>) {
 //   const accounts = await program.account.coveredCall.all();
@@ -84,36 +83,51 @@ const programId = new PublicKey("3JZ99S1BGfcdExZ4immxWKSGAFkbe3hxZo9NRxvrair4");
 //   }));
 // }
 
+async function getSolPrice(): Promise<number> {
+  const { data } = await axios({
+    method: "GET",
+    url: "https://api.binance.com/api/v3/ticker/price",
+    params: {
+      symbol: "SOLUSDC",
+    },
+  });
+
+  return parseFloat(data.price);
+}
+
 describe.skip(
   "Devnet Solana Options",
   {
     timeout: 60_000,
     sequential: true,
   },
-  () => {
+  async () => {
+    const price = await getSolPrice();
+    const strike = Math.round(price * 0.95);
+
     const amountBase = parseUnits("0.1", 9);
-    const amountQuote = parseUnits("0.01", 6);
+    const amountQuote = getQuoteAmountWithStrike(amountBase, strike);
     const amountPremium = parseUnits("0.02", 9);
 
-    const expiry = new BN(Math.floor(Date.now() / 1000) + 60);
+    const expiry = new BN(Math.floor(Date.now() / 1000) + 5);
 
     const usdcKeypair = Keypair.fromSecretKey(
-      Buffer.from(JSON.parse(fs.readFileSync("./.secrets/usdc.json", "utf-8"))),
+      Buffer.from(JSON.parse(fs.readFileSync("./.secrets/usdc.json", "utf-8")))
     );
     const usdc = usdcKeypair.publicKey;
 
     const ataBuyerSol = getAssociatedTokenAddressSync(
       NATIVE_MINT,
-      buyer.publicKey,
+      buyer.publicKey
     );
     const ataSellerSol = getAssociatedTokenAddressSync(
       NATIVE_MINT,
-      seller.publicKey,
+      seller.publicKey
     );
     const ataBuyerQuote = getAssociatedTokenAddressSync(usdc, buyer.publicKey);
     const ataSellerQuote = getAssociatedTokenAddressSync(
       usdc,
-      seller.publicKey,
+      seller.publicKey
     );
     const pda = getPda({
       amountQuote: amountQuote,
@@ -130,32 +144,26 @@ describe.skip(
       console.log("Running against: ", RPC);
       console.log("Seller       :", seller.publicKey.toString());
       console.log("Seller WSOL  :", ataSellerSol.toString());
-      console.log("Seller USDC  :", ataSellerQuote.toString());
       console.log("");
       console.log("Buyer        :", buyer.publicKey.toString());
       console.log("Buyer WSOL   :", ataBuyerSol.toString());
-      console.log("Buyer USDC   :", ataBuyerQuote.toString());
       console.log("");
       console.log("Vault PDA    :", pda.toString());
       console.log(
         "Vault WSOL   :",
-        getAssociatedTokenAddressSync(NATIVE_MINT, pda, true).toString(),
-      );
-      console.log(
-        "Vault USDC   :",
-        getAssociatedTokenAddressSync(usdc, pda, true).toString(),
+        getAssociatedTokenAddressSync(NATIVE_MINT, pda, true).toString()
       );
       const [solPayer, solSeller, solBuyer] = await Promise.all(
         [payer, seller, buyer].map((a) =>
-          connection.getBalance(a.publicKey).then((x) => BigInt(x)),
-        ),
+          connection.getBalance(a.publicKey).then((x) => BigInt(x))
+        )
       );
 
       // Fund all accounts with necessary SOL
       if (solPayer < parseUnits("1", 9)) {
         const sig = await connection.requestAirdrop(
           payer.publicKey,
-          Number(parseUnits("5", 9)),
+          Number(parseUnits("5", 9))
         );
         log("Requested airdrop to payer", sig);
       }
@@ -166,79 +174,13 @@ describe.skip(
             fromPubkey: payer.publicKey,
             toPubkey: seller.publicKey,
             lamports: amountBase + gas - solSeller,
-          }),
+          })
         );
+
         tx.feePayer = payer.publicKey;
         await connection
           .sendTransaction(tx, [payer])
           .then((sig) => log("Topped up sol to seller", sig));
-      }
-
-      if (solBuyer < amountQuote + gas) {
-        const tx = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: payer.publicKey,
-            toPubkey: buyer.publicKey,
-            lamports: amountQuote + gas - solBuyer,
-          }),
-        );
-        tx.feePayer = payer.publicKey;
-        await connection
-          .sendTransaction(tx, [payer])
-          .then((sig) => log("Topped up quote to buyer", sig));
-      }
-
-      // Create USDC if not exists
-      if ((await connection.getAccountInfo(usdc)) === null) {
-        await createMint(
-          connection,
-          payer,
-          payer.publicKey,
-          null,
-          6,
-          usdcKeypair,
-        ).then(() => {
-          console.log("Created USDC Mint", usdc.toString());
-        });
-      }
-
-      if ((await connection.getAccountInfo(ataSellerQuote)) === null) {
-        await createAssociatedTokenAccount(
-          connection,
-          payer,
-          usdc,
-          seller.publicKey,
-        ).then(() => console.log("Created Seller USDC ata"));
-      }
-
-      // Airdrop USDC to buyer
-      if ((await connection.getAccountInfo(ataBuyerQuote)) === null) {
-        await createAssociatedTokenAccount(
-          connection,
-          payer,
-          usdc,
-          buyer.publicKey,
-        ).then(() => console.log("Created Buyer USDC ata"));
-        await mintTo(
-          connection,
-          payer,
-          usdc,
-          ataBuyerQuote,
-          payer,
-          amountQuote,
-        ).then(() => console.log("Minted USDC to Buyer"));
-      }
-
-      const info = await getAccount(connection, ataBuyerQuote);
-      if (info.amount < amountQuote) {
-        await mintTo(
-          connection,
-          payer,
-          usdc,
-          ataBuyerQuote,
-          payer,
-          amountQuote - info.amount,
-        ).then(() => console.log("Minted USDC to Buyer"));
       }
     }, 100_000);
 
@@ -247,14 +189,14 @@ describe.skip(
         .initialize(
           new BN(amountBase.toString()),
           new BN(amountQuote.toString()),
-          expiry,
+          expiry
         )
         .preInstructions([
           createAssociatedTokenAccountInstruction(
             seller.publicKey,
             ataSellerSol,
             seller.publicKey,
-            NATIVE_MINT,
+            NATIVE_MINT
           ),
           SystemProgram.transfer({
             fromPubkey: seller.publicKey,
@@ -273,7 +215,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataSellerSol,
             seller.publicKey,
-            seller.publicKey,
+            seller.publicKey
           ),
         ])
         .signers([seller])
@@ -304,7 +246,7 @@ describe.skip(
             buyer.publicKey,
             ataBuyerSol,
             buyer.publicKey,
-            NATIVE_MINT,
+            NATIVE_MINT
           ),
           SystemProgram.transfer({
             fromPubkey: buyer.publicKey,
@@ -316,13 +258,14 @@ describe.skip(
         .accounts({
           data: pda,
           buyer: buyer.publicKey,
+          payer: buyer.publicKey,
           mintPremium: NATIVE_MINT,
         })
         .postInstructions([
           createCloseAccountInstruction(
             ataBuyerSol,
             buyer.publicKey,
-            buyer.publicKey,
+            buyer.publicKey
           ),
         ])
         .signers([buyer])
@@ -346,7 +289,32 @@ describe.skip(
       });
     });
 
+    it("Can mark option", async () => {
+      const pyth = new PythSolanaReceiver({
+        connection,
+        wallet: new Wallet(payer),
+      });
+
+      const SOL_PRICE_FEED_ID =
+        "0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d";
+      const priceUpdate = pyth.getPriceFeedAccountAddress(0, SOL_PRICE_FEED_ID);
+      const tx = await program.methods
+        .mark(expiry)
+        .accounts({
+          payer: payer.publicKey,
+          priceUpdate,
+        })
+        .signers([payer])
+        .rpc();
+
+      console.log("Marked option", tx);
+    });
+
     it("can exercise option", async () => {
+      await new Promise(
+        (r) => setTimeout(r, expiry.toNumber() * 1000 - Date.now() + 2000) // Wait to 2 seconds after expiry
+      );
+      console.log("Option is now expired, exercising");
       const tx = await program.methods
         .exercise()
         .preInstructions([
@@ -354,7 +322,7 @@ describe.skip(
             buyer.publicKey,
             ataBuyerSol,
             buyer.publicKey,
-            NATIVE_MINT,
+            NATIVE_MINT
           ),
         ])
         .accounts({
@@ -367,7 +335,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataBuyerSol,
             buyer.publicKey,
-            buyer.publicKey,
+            buyer.publicKey
           ),
         ])
         .signers([buyer])
@@ -398,12 +366,11 @@ describe.skip(
             seller.publicKey,
             ataSellerSol,
             seller.publicKey,
-            NATIVE_MINT,
+            NATIVE_MINT
           ),
         ])
         .accounts({
           mintBase: NATIVE_MINT,
-          mintQuote: usdc,
           data: pda,
           seller: seller.publicKey,
           payer: seller.publicKey,
@@ -413,7 +380,7 @@ describe.skip(
           createCloseAccountInstruction(
             ataSellerSol,
             seller.publicKey,
-            seller.publicKey,
+            seller.publicKey
           ),
         ])
         .signers([seller])
@@ -423,23 +390,23 @@ describe.skip(
     });
 
     it("Can reset balances", async () => {
-      const tx2 = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: buyer.publicKey,
-          toPubkey: seller.publicKey,
-          lamports: amountBase - amountPremium,
-        }),
-        createTransferInstruction(
-          ataSellerQuote,
-          ataBuyerQuote,
-          seller.publicKey,
-          amountQuote,
-        ),
+      const transaction = new VersionedTransaction(
+        new TransactionMessage({
+          payerKey: buyer.publicKey,
+          recentBlockhash: (await connection.getLatestBlockhash()).blockhash!,
+          instructions: [
+            SystemProgram.transfer({
+              fromPubkey: buyer.publicKey,
+              toPubkey: seller.publicKey,
+              lamports: amountBase - amountPremium,
+            }),
+          ],
+        }).compileToV0Message()
       );
 
-      tx2.feePayer = payer.publicKey;
-      const sig = await connection.sendTransaction(tx2, [buyer, seller, payer]);
+      transaction.sign([buyer]);
+      const sig = await connection.sendTransaction(transaction);
       log("Rebalanced funds", sig);
     });
-  },
+  }
 );

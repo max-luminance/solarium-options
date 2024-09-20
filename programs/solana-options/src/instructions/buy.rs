@@ -33,11 +33,11 @@ pub struct Buy<'info> {
     pub mint_premium: Account<'info, Mint>,
     #[account(
         mut,
-        constraint = ata_buyer_premium.amount >= amount_premium,
+        constraint = ata_payer_premium.amount >= amount_premium,
         associated_token::mint = mint_premium,
         associated_token::authority = payer,
     )]
-    pub ata_buyer_premium: Account<'info, TokenAccount>, // This already exists because we enforce it to be base
+    pub ata_payer_premium: Account<'info, TokenAccount>, // This already exists because we enforce it to be base
     #[account(
         mut,
         associated_token::mint = mint_premium,
@@ -68,7 +68,7 @@ pub fn handle_buy(ctx: Context<Buy>, amount_premium: u64) -> Result<()> {
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
-                from: ctx.accounts.ata_buyer_premium.to_account_info(),
+                from: ctx.accounts.ata_payer_premium.to_account_info(),
                 to: ctx.accounts.ata_vault_premium.to_account_info(),
                 mint: ctx.accounts.mint_premium.to_account_info(),
                 authority: ctx.accounts.payer.to_account_info(),
