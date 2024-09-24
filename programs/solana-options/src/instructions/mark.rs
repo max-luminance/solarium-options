@@ -47,9 +47,16 @@ pub fn handle_mark(ctx: Context<Mark>, expiry: i64) -> Result<()> {
 
     // Ensure updated price is more recent
     require!(
-        price.publish_time > ctx.accounts.expiry.publish_time,
+        price.publish_time >= ctx.accounts.expiry.publish_time,
         ErrorCode::PriceIrrelevant
     );
+
+    // Set payer for rent repayment if none set
+    let payer = if ctx.accounts.expiry.payer == Pubkey::default() {
+        ctx.accounts.payer.as_ref().key()
+    } else {
+        ctx.accounts.expiry.payer
+    };
 
     ctx.accounts.expiry.set_inner(ExpiryData {
         price: price.price,
@@ -57,6 +64,7 @@ pub fn handle_mark(ctx: Context<Mark>, expiry: i64) -> Result<()> {
         exponent: price.exponent,
         publish_time: price.publish_time,
         bump: ctx.bumps.expiry,
+        payer,
     });
     Ok(())
 }

@@ -37,6 +37,10 @@ pub mod solana_options {
         handle_initialize(ctx, amount_base, amount_quote, timestamp_expiry)
     }
 
+    pub fn mark_close(ctx: Context<MarkClose>, timestamp_expiry: i64) -> Result<()> {
+        handle_mark_close(ctx, timestamp_expiry)
+    }
+
     pub fn mark(ctx: Context<Mark>, timestamp_expiry: i64) -> Result<()> {
         handle_mark(ctx, timestamp_expiry)
     }

@@ -46,14 +46,6 @@ pub struct Initialize<'info> {
         associated_token::authority = data,
     )]
     pub ata_vault_base: Account<'info, TokenAccount>,
-    // Can't figure out why i can't init this account here
-    // #[account(
-    //     init,
-    //     payer = seller,
-    //     associated_token::mint = mint_quote,
-    //     associated_token::authority = data,
-    // )]
-    // pub ata_vault_quote: Account<'info, TokenAccount>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,

@@ -35,16 +35,13 @@ pub struct Close<'info> {
     )]
     pub data: Account<'info, CoveredCall>,
     #[account(
-        init_if_needed,
-        payer = payer,
-        space = 8 + ExpiryData::INIT_SPACE,
         seeds = [
           "expiry-meta".as_bytes(),
            &data.timestamp_expiry.to_le_bytes(),
         ],
-        bump,
+        bump = expiry.bump,
     )]
-    pub expiry: Account<'info, ExpiryData>,
+    pub expiry: Option<Account<'info, ExpiryData>>,
     #[account( constraint = mint_base.key() == data.mint_base)]
     pub mint_base: Account<'info, Mint>,
     #[account(
@@ -84,13 +81,17 @@ pub fn handle_close(ctx: Context<Close>) -> Result<()> {
         ctx.accounts.data.amount_base,
         ctx.accounts.data.amount_quote,
     );
+    let is_expired = clock.unix_timestamp >= ctx.accounts.data.timestamp_expiry;
+    let is_exercised = ctx.accounts.data.is_exercised;
+    let is_otm = ctx
+        .accounts
+        .expiry
+        .as_ref()
+        .is_some_and(|x| x.price > 0 && x.price <= strike);
 
     require!(
-        clock.unix_timestamp > ctx.accounts.data.timestamp_expiry
-            || (ctx.accounts.expiry.price != 0 && ctx.accounts.expiry.price <= strike) // Must be out of the money or...
-            || ctx.accounts.data.is_exercised  // Buyer already exercised
-            || ctx.accounts.data.amount_premium.is_none(),
-        ErrorCode::OptionCannotBeClosedYet
+        (is_expired && (is_exercised || is_otm)) || ctx.accounts.data.amount_premium.is_none(),
+        ErrorCode::OptionCannotBeClosedYet,
     );
 
     // Transfer base to seller

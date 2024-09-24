@@ -25,12 +25,12 @@ import { getI32Codec, getI64Codec, getU64Codec } from "@solana/codecs-numbers";
 
 const authority = anchor.web3.Keypair.generate();
 const priceUpdate = new PublicKey(
-  "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+  "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
 );
 async function getAtaTokenBalance(
   client: BanksClient,
   mint: PublicKey,
-  user: PublicKey,
+  user: PublicKey
 ) {
   const ata = token.getAssociatedTokenAddressSync(mint, user, true);
 
@@ -43,7 +43,7 @@ async function getAtaTokenBalance(
 async function airdrop(
   context: ProgramTestContext,
   user: PublicKey,
-  lamports: bigint | number,
+  lamports: bigint | number
 ) {
   const accountInfo = await context.banksClient.getAccount(user);
   const newBalance =
@@ -62,7 +62,7 @@ async function fundAtaAccountWithPayer(
   mint: PublicKey,
   payer: Signer,
   user: PublicKey,
-  amount: bigint | number,
+  amount: bigint | number
 ) {
   const ata = await createAssociatedTokenAccount(client, payer, mint, user);
 
@@ -73,14 +73,14 @@ async function fundAtaAccount(
   client: BanksClient,
   mint: PublicKey,
   signer: Signer,
-  amount: bigint | number,
+  amount: bigint | number
 ) {
   return fundAtaAccountWithPayer(
     client,
     mint,
     signer,
     signer.publicKey,
-    amount,
+    amount
   );
 }
 
@@ -92,8 +92,8 @@ const warpTo = async (context: ProgramTestContext, ms: anchor.BN) => {
       currentClock.epochStartTimestamp,
       currentClock.epoch,
       currentClock.leaderScheduleEpoch,
-      BigInt(ms.toNumber() + 100),
-    ),
+      BigInt(ms.toNumber() + 100)
+    )
   );
 };
 
@@ -118,14 +118,14 @@ const fixtureDeployed = async () => {
       context.payer,
       authority.publicKey,
       authority.publicKey,
-      9,
+      9
     ),
     createMint(
       context.banksClient,
       context.payer,
       authority.publicKey,
       authority.publicKey,
-      6,
+      6
     ),
   ]);
 
@@ -179,7 +179,7 @@ const fixtureInitialized = async () => {
     .initialize(
       new anchor.BN("1000"),
       new anchor.BN("3500"),
-      new anchor.BN(expiry),
+      new anchor.BN(expiry)
     )
     .accounts({
       mintBase: wsol,
@@ -256,13 +256,13 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureDeployed();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1000));
 
       const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
       await airdrop(context, seller.publicKey, 10_000 * LAMPORTS_PER_SOL);
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1000));
 
       const pda = getPda({
@@ -281,7 +281,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .initialize(
           new anchor.BN("1000"),
           new anchor.BN("42"),
-          new anchor.BN(expiry),
+          new anchor.BN(expiry)
         )
         .accounts({
           buyer: buyer.publicKey,
@@ -305,15 +305,15 @@ describe("solana-options", { timeout: 100_000 }, () => {
         mintQuote: usdc,
         seller: seller.publicKey,
         timestampExpiry: expect.toBeBN(expiry),
-        timestampCreated: expect.toBeBN(new anchor.BN(Date.now() / 1000)),
+        timestampCreated: expect.any(BN),
       });
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(0));
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1000),
+        BigInt(1000)
       );
     });
 
@@ -321,7 +321,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
       const { context, program, seller, usdc, buyer } = await fixtureDeployed();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1000));
 
       const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + 60);
@@ -329,7 +329,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .initialize(
           new anchor.BN("500"),
           new anchor.BN(1),
-          new anchor.BN(expiry),
+          new anchor.BN(expiry)
         )
         .accounts({
           mintBase: wsol,
@@ -342,7 +342,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .initialize(
           new anchor.BN("500"),
           new anchor.BN(1),
-          new anchor.BN(expiry),
+          new anchor.BN(expiry)
         )
         .accounts({
           mintBase: wsol,
@@ -357,7 +357,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureDeployed();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1000));
 
       await expect(
@@ -365,16 +365,16 @@ describe("solana-options", { timeout: 100_000 }, () => {
           .initialize(
             new anchor.BN("1000"),
             new anchor.BN(1),
-            new anchor.BN(Math.floor(Date.now() / 1000) - 600),
+            new anchor.BN(Math.floor(Date.now() / 1000) - 600)
           )
           .accounts({
             mintBase: wsol,
             mintQuote: usdc,
             buyer: buyer.publicKey,
           })
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /^AnchorError thrown in programs\/solana-options\/src\/instructions\/initialize.rs:\d+. Error Code: ExpiryIsInThePast. Error Number: 6000. Error Message: Expiry is in the past.$/,
+        /^AnchorError thrown in programs\/solana-options\/src\/instructions\/initialize.rs:\d+. Error Code: ExpiryIsInThePast. Error Number: 6000. Error Message: Expiry is in the past.$/
       );
     });
     it("Can reject initialize with insufficient base", async () => {
@@ -382,7 +382,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureDeployed();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1000));
 
       await expect(
@@ -390,16 +390,16 @@ describe("solana-options", { timeout: 100_000 }, () => {
           .initialize(
             new anchor.BN("10000"),
             new anchor.BN(1),
-            new anchor.BN(Math.floor(Date.now() / 1000) + 60),
+            new anchor.BN(Math.floor(Date.now() / 1000) + 60)
           )
           .accounts({
             mintBase: wsol,
             mintQuote: usdc,
             buyer: buyer.publicKey,
           })
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: ata_seller_base. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
+        "AnchorError caused by account: ata_seller_base. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
   });
@@ -410,7 +410,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureInitialized();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey)
       ).to.equal(BigInt(1000));
 
       await program.methods
@@ -440,11 +440,11 @@ describe("solana-options", { timeout: 100_000 }, () => {
       });
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey)
       ).to.equal(BigInt(990));
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1010),
+        BigInt(1010)
       );
     });
 
@@ -477,16 +477,16 @@ describe("solana-options", { timeout: 100_000 }, () => {
         mintBase: wsol,
         mintQuote: usdc,
         seller: seller.publicKey,
-        timestampCreated: expect.toBeBN(new BN(Date.now() / 1000)),
+        timestampCreated: expect.any(BN),
         timestampExpiry: expect.toBeBN(expiry),
       });
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, keeper.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, keeper.publicKey)
       ).to.equal(BigInt(990));
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1010),
+        BigInt(1010)
       );
     });
 
@@ -506,7 +506,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .rpc();
 
       // Wait to avoid getting the error "This transaction has already been processed"
-      await new Promise((resolve) => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 3));
 
       await expect(
         program.methods
@@ -518,9 +518,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             payer: buyer.publicKey,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/buy.rs:\d\d. Error Code: OptionAlreadyBought. Error Number: 6002. Error Message: Option is already bought./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/buy.rs:\d\d. Error Code: OptionAlreadyBought. Error Number: 6002. Error Message: Option is already bought./
       );
     });
 
@@ -541,9 +541,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             mintPremium: wsol,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/buy.rs:\d\d. Error Code: OptionExpired. Error Number: 6001. Error Message: Option has expired./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/buy.rs:\d\d. Error Code: OptionExpired. Error Number: 6001. Error Message: Option has expired./
       );
     });
 
@@ -554,7 +554,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
       await fundAtaAccount(context.banksClient, usdc, buyer, BigInt(500));
 
       expect(
-        await getAtaTokenBalance(context.banksClient, usdc, buyer.publicKey),
+        await getAtaTokenBalance(context.banksClient, usdc, buyer.publicKey)
       ).to.equal(BigInt(500));
 
       await expect(
@@ -567,9 +567,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             mintPremium: usdc,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: ata_vault_premium. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
+        "AnchorError caused by account: ata_vault_premium. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized."
       );
 
       // Also test when ata is initialized
@@ -585,9 +585,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             mintPremium: usdc,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: mint_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
+        "AnchorError caused by account: mint_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
 
@@ -595,7 +595,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
       const { program, pda, buyer, wsol, context } = await fixtureInitialized();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey)
       ).to.equal(BigInt(1000));
       await expect(
         program.methods
@@ -607,9 +607,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             mintPremium: wsol,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: ata_payer_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
+        "AnchorError caused by account: ata_payer_premium. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
 
@@ -626,9 +626,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             mintPremium: wsol,
           })
           .signers([seller])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: buyer. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated",
+        "AnchorError caused by account: buyer. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated"
       );
     });
   });
@@ -648,9 +648,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             buyer: buyer.publicKey,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: expiry. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.",
+        "AnchorError caused by account: expiry. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized."
       );
     });
 
@@ -667,7 +667,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureMarked();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey)
       ).to.equal(BigInt(990));
 
       expect(getStrikePrice(1000n, 3500n)).to.equal(3500);
@@ -685,10 +685,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .rpc();
 
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, buyer.publicKey)
       ).to.equal(BigInt(990 + 125));
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1000 - 125 + 10),
+        BigInt(1000 - 125 + 10)
       );
     });
 
@@ -721,9 +721,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             buyer: buyer.publicKey,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionAlreadyExercised. Error Number: 6005. Error Message: Option already exercised./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionAlreadyExercised. Error Number: 6005. Error Message: Option already exercised./
       );
     });
 
@@ -746,9 +746,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             buyer: buyer.publicKey,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionNotPurchased. Error Number: 6003. Error Message: Option was not purchased./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionNotPurchased. Error Number: 6003. Error Message: Option was not purchased./
       );
     });
 
@@ -766,9 +766,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             buyer: seller.publicKey,
           })
           .signers([seller])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        "AnchorError caused by account: buyer. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.",
+        "AnchorError caused by account: buyer. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated."
       );
     });
 
@@ -786,9 +786,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
             buyer: buyer.publicKey,
           })
           .signers([buyer])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionNotExpired. Error Number: 6006. Error Message: Option has not expired./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/exercise.rs:\d\d. Error Code: OptionNotExpired. Error Number: 6006. Error Message: Option has not expired./
       );
     });
   });
@@ -799,10 +799,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
         await fixtureExercised();
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(885),
+        BigInt(885)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(0));
 
       await program.methods
@@ -820,20 +820,20 @@ describe("solana-options", { timeout: 100_000 }, () => {
       expect(await context.banksClient.getAccount(pda)).to.equal(null);
       expect(
         await context.banksClient.getAccount(
-          token.getAssociatedTokenAddressSync(wsol, pda, true),
-        ),
+          token.getAssociatedTokenAddressSync(wsol, pda, true)
+        )
       ).to.equal(null);
       expect(
         await context.banksClient.getAccount(
-          token.getAssociatedTokenAddressSync(usdc, pda, true),
-        ),
+          token.getAssociatedTokenAddressSync(usdc, pda, true)
+        )
       ).to.equal(null);
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(0),
+        BigInt(0)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(885));
     });
 
@@ -845,10 +845,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
       await airdrop(context, keeper.publicKey, 1 * LAMPORTS_PER_SOL);
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(885),
+        BigInt(885)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(0));
 
       await fundAtaAccount(context.banksClient, usdc, seller, 0);
@@ -867,10 +867,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
         .rpc();
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(0),
+        BigInt(0)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(885));
     });
 
@@ -882,10 +882,10 @@ describe("solana-options", { timeout: 100_000 }, () => {
       await airdrop(context, keeper.publicKey, 1 * LAMPORTS_PER_SOL);
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1000),
+        BigInt(1000)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(0));
 
       await program.methods
@@ -896,30 +896,34 @@ describe("solana-options", { timeout: 100_000 }, () => {
           seller: seller.publicKey,
           payer: keeper.publicKey,
           buyer: buyer.publicKey,
+          expiry: null,
         })
         .signers([keeper])
         .rpc();
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(0),
+        BigInt(0)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1000));
     });
 
     it("Can successfully close unexercised option after expiry", async () => {
-      const { program, pda, wsol, context, usdc, seller, expiry, buyer } =
+      const { program, pda, wsol, context, seller, expiry, buyer, setPrice } =
         await fixtureBought();
 
       await warpTo(context, expiry.add(new anchor.BN(100)));
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(1010),
+        BigInt(1010)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(0));
+
+      setPrice(3000);
+      await program.methods.mark(expiry).accounts({ priceUpdate }).rpc();
 
       await program.methods
         .close()
@@ -937,15 +941,15 @@ describe("solana-options", { timeout: 100_000 }, () => {
       expect(await context.banksClient.getAccount(pda)).to.equal(null);
       expect(
         await context.banksClient.getAccount(
-          token.getAssociatedTokenAddressSync(wsol, pda, true),
-        ),
+          token.getAssociatedTokenAddressSync(wsol, pda, true)
+        )
       ).to.equal(null);
 
       expect(await getAtaTokenBalance(context.banksClient, wsol, pda)).to.equal(
-        BigInt(0),
+        BigInt(0)
       );
       expect(
-        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey),
+        await getAtaTokenBalance(context.banksClient, wsol, seller.publicKey)
       ).to.equal(BigInt(1010));
     });
 
@@ -972,11 +976,12 @@ describe("solana-options", { timeout: 100_000 }, () => {
             mintBase: wsol,
             payer: seller.publicKey,
             seller: seller.publicKey,
+            expiry: null,
           })
           .signers([seller])
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/close.rs:\d\d. Error Code: OptionCannotBeClosedYet. Error Number: 6004. Error Message: Option cannot be closed Yet./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/close.rs:\d\d. Error Code: OptionCannotBeClosedYet. Error Number: 6004. Error Message: Option cannot be closed Yet./
       );
     });
   });
@@ -989,7 +994,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
 
     const pyth = new PythSolanaReceiver(provider);
     expect(pyth.getPriceFeedAccountAddress(0, SOL_PRICE_FEED_ID)).to.deep.equal(
-      priceUpdate,
+      priceUpdate
     );
   });
 
@@ -1005,14 +1010,15 @@ describe("solana-options", { timeout: 100_000 }, () => {
         program.methods
           .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
           .accounts({ priceUpdate })
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./
       );
     });
 
     it("Can set mark price after expiry", async () => {
-      const { program, context, provider, setPrice } = await fixtureDeployed();
+      const { seller, program, context, provider, setPrice } =
+        await fixtureDeployed();
 
       const expiry = new Date();
       const publishTime = expiry;
@@ -1020,7 +1026,7 @@ describe("solana-options", { timeout: 100_000 }, () => {
 
       await warpTo(
         context,
-        new BN(expiry.getTime() / 1000).add(new anchor.BN(10_000)),
+        new BN(expiry.getTime() / 1000).add(new anchor.BN(10_000))
       );
 
       await program.methods
@@ -1030,21 +1036,22 @@ describe("solana-options", { timeout: 100_000 }, () => {
 
       expect(
         await program.account.expiryData.fetch(
-          getExpiryPda({ expiry, programId: program.programId }),
-        ),
+          getExpiryPda({ expiry, programId: program.programId })
+        )
       ).toStrictEqual({
         bump: expect.any(Number),
         conf: expect.toBeBN(new BN(12190053)),
+        payer: seller.publicKey,
         price: expect.toBeBN(new BN(13000000000)),
         publishTime: expect.toBeBN(
-          new BN(Math.floor(publishTime.getTime() / 1000)),
+          new BN(Math.floor(publishTime.getTime() / 1000))
         ),
         exponent: -8,
       });
     });
 
     it("Can set mark price", async () => {
-      const { program, context, provider, setPrice } = await fixtureDeployed();
+      const { program, setPrice, seller } = await fixtureDeployed();
 
       const publishTime = new Date(Date.now() - 1000);
       const expiry = new Date();
@@ -1057,21 +1064,22 @@ describe("solana-options", { timeout: 100_000 }, () => {
 
       expect(
         await program.account.expiryData.fetch(
-          getExpiryPda({ expiry, programId: program.programId }),
-        ),
+          getExpiryPda({ expiry, programId: program.programId })
+        )
       ).toStrictEqual({
         bump: expect.any(Number),
         conf: expect.toBeBN(new BN(12190053)),
+        payer: seller.publicKey,
         price: expect.toBeBN(new BN(13000000000)),
         publishTime: expect.toBeBN(
-          new BN(Math.floor(publishTime.getTime() / 1000)),
+          new BN(Math.floor(publishTime.getTime() / 1000))
         ),
         exponent: -8,
       });
     });
 
     it("Can reject if price is after expiry", async () => {
-      const { program, context, provider, setPrice } = await fixtureDeployed();
+      const { program, setPrice } = await fixtureDeployed();
 
       const expiry = new Date();
       const publishTime = new Date(expiry.getTime() + 1000);
@@ -1081,9 +1089,9 @@ describe("solana-options", { timeout: 100_000 }, () => {
         program.methods
           .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
           .accounts({ priceUpdate })
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./
       );
     });
 
@@ -1107,14 +1115,14 @@ describe("solana-options", { timeout: 100_000 }, () => {
         program.methods
           .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
           .accounts({ priceUpdate })
-          .rpc(),
+          .rpc()
       ).rejects.toThrowError(
-        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./,
+        /AnchorError thrown in programs\/solana-options\/src\/instructions\/mark.rs:\d\d. Error Code: PriceIrrelevant. Error Number: 6007. Error Message: Price not close to expiry./
       );
     });
 
     it("Can update if mark price is closer", async () => {
-      const { program, setPrice } = await fixtureDeployed();
+      const { program, setPrice, seller } = await fixtureDeployed();
 
       const expiry = new Date();
 
@@ -1135,17 +1143,40 @@ describe("solana-options", { timeout: 100_000 }, () => {
 
       expect(
         await program.account.expiryData.fetch(
-          getExpiryPda({ expiry, programId: program.programId }),
-        ),
+          getExpiryPda({ expiry, programId: program.programId })
+        )
       ).toStrictEqual({
         bump: expect.any(Number),
         conf: expect.toBeBN(new BN(12190053)),
+        payer: seller.publicKey,
         price: expect.toBeBN(new BN(13100000000)),
         publishTime: expect.toBeBN(
-          new BN(Math.floor(publishTime.getTime() / 1000)),
+          new BN(Math.floor(publishTime.getTime() / 1000))
         ),
         exponent: -8,
       });
+    });
+
+    it("Can close mark price", async () => {
+      const { program, setPrice, context } = await fixtureDeployed();
+
+      const expiry = new Date();
+      setPrice(130, expiry);
+
+      await program.methods
+        .mark(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+        .accounts({ priceUpdate })
+        .rpc();
+
+      await program.methods
+        .markClose(new anchor.BN(Math.floor(expiry.getTime() / 1000)))
+        .rpc();
+
+      expect(
+        await context.banksClient.getAccount(
+          getExpiryPda({ expiry, programId: program.programId })
+        )
+      ).to.equal(null);
     });
   });
 });

@@ -24,4 +24,5 @@ pub struct ExpiryData {
     pub exponent: i32,
     pub publish_time: i64,
     pub bump: u8,
+    pub payer: Pubkey,
 }

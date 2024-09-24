@@ -389,6 +389,15 @@ describe.skip(
       log("Closed option", tx);
     });
 
+    it("can close expiry account", async () => {
+      const tx = await program.methods
+        .markClose(expiry)
+        .signers([seller])
+        .rpc();
+
+      log("Closed expiry account", tx);
+    });
+
     it("Can reset balances", async () => {
       const transaction = new VersionedTransaction(
         new TransactionMessage({
