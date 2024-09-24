@@ -33,7 +33,7 @@ function recover() {
   cli program write-buffer \
     --buffer $FILE \
     --buffer-authority $KEY \
-    ./target/deploy/solana_options.so
+    ./target/verifiable/solana_options.so
 }
 
 
