@@ -30,10 +30,9 @@ function recover() {
   
   solana-keygen recover -o $FILE
 
-  cli program deploy \
+  cli program write-buffer \
     --buffer $FILE \
-    --upgrade-authority $KEY \
-    --program-id ./target/deploy/solana_options-keypair.json \
+    --buffer-authority $KEY \
     ./target/deploy/solana_options.so
 }
 

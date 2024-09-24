@@ -1,6 +1,10 @@
 // Has 8 decimal precision to match pyth price oracle
 pub fn calc_strike(base: u64, quote: u64) -> i64 {
-    (quote * 10u64.pow(3 + 8) / base).try_into().unwrap()
+    // Convert to u128 to avoid overflow and maintain precision
+    let base = u128::from(base);
+    let quote = u128::from(quote);
+    let result = (quote * 10u128.pow(8 + 3) / base) as u64;
+    result.try_into().unwrap()
 }
 
 pub fn get_settlements(strike: i64, mark: i64, amount: u64) -> [u64; 2] {
@@ -23,6 +27,7 @@ mod tests {
         assert_eq!(calc_strike(1000, 3500), 3500_0000_0000);
         assert_eq!(calc_strike(1_000_000_000, 130_000_000), 130_0000_0000);
         assert_eq!(calc_strike(1_000_000_000, 130_500_000), 130_5000_0000);
+        assert_eq!(calc_strike(10000000, 1370000000000), 137000000_0000_0000); // Created this strike with incorrect decimals
     }
 
     #[test]
