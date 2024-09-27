@@ -11,9 +11,10 @@ pub fn get_settlements(strike: i64, mark: i64, amount: u64) -> [u64; 2] {
     if mark <= strike {
         return [amount, 0];
     }
+    // Convert to u128 to avoid overflow and maintain precision
     // Round down the seller
-    let seller = amount * TryInto::<u64>::try_into(strike).unwrap()
-        / TryInto::<u64>::try_into(mark).unwrap();
+    let seller = (u128::from(amount) * u128::from(strike.unsigned_abs())
+        / u128::from(mark.unsigned_abs())) as u64;
 
     [seller, amount - seller]
 }
@@ -39,5 +40,10 @@ mod tests {
 
         // In the money
         assert_eq!(get_settlements(130, 140, 1_000), [928, 72]); // 928.57, 71.42
+
+        assert_eq!(
+            get_settlements(calc_strike(3000000000, 450000000), 15180059921, 3000000000),
+            [2964415175, 35584825]
+        );
     }
 }
